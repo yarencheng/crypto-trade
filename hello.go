@@ -1,7 +1,5 @@
-package main
+package cryptotrade
 
-import "fmt"
-
-func main() {
-	fmt.Printf("Hello, world.\n")
+func Hello(name string) string {
+	return "Hello " + name
 }
