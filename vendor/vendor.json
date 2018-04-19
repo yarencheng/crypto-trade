@@ -1,0 +1,33 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "GWtDi0sYbtCQzF/ZaVhaHvCMvuk=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "c155da19408a8799da419ed3eeb0cb5db0ad5dbc",
+			"revisionTime": "2018-03-11T22:51:37Z",
+			"version": "v1",
+			"versionExact": "v1.0.5"
+		},
+		{
+			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "d6449816ce06963d9d136eee5a56fca5b0616e7e",
+			"revisionTime": "2018-04-11T15:42:50Z"
+		},
+		{
+			"checksumSHA1": "31n/IvwJf+PtXWf1EPwQYcde1jY=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "b126b21c05a91c856b027c16779c12e3bf236954",
+			"revisionTime": "2018-04-16T10:06:24Z"
+		},
+		{
+			"checksumSHA1": "Dfz4tGItokMvHZENCsBmPPB8FGQ=",
+			"path": "golang.org/x/sys/windows",
+			"revision": "b126b21c05a91c856b027c16779c12e3bf236954",
+			"revisionTime": "2018-04-16T10:06:24Z"
+		}
+	],
+	"rootPath": "github.com/yarencheng/crypto-trade"
+}
