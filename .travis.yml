@@ -9,5 +9,5 @@ install:
 
 script:
   - govendor test +local
-
+  - govendor install +local
   
