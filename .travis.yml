@@ -10,6 +10,4 @@ install:
 script:
   - govendor test +local
 
-deploy:
-  - govendor install +local
   
