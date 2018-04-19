@@ -23,8 +23,6 @@ var log = logrus.New()
 
 func main() {
 
-	logrus.Infoln("daemon starts")
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
@@ -35,6 +33,4 @@ func main() {
 	<-stop
 
 	f.Stop()
-
-	logrus.Infoln("daemon stopped")
 }
