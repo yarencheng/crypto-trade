@@ -3,6 +3,6 @@ package data
 type Order struct {
 	from   Currency
 	to     Currency
-	price  float32
-	amount float32
+	price  float64
+	amount float64
 }
