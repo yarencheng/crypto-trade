@@ -6,7 +6,6 @@ import (
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	cryptotrade "github.com/yarencheng/crypto-trade"
 )
 
 func init() {
@@ -26,11 +25,5 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	f := cryptotrade.NewFishingStore()
-
-	go f.Run()
-
 	<-stop
-
-	f.Stop()
 }
