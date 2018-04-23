@@ -3,6 +3,28 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "IPuI0TCUlOnJGLYWyJDDH6xbtZg=",
+			"path": "github.com/jinzhu/gorm",
+			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
+			"revisionTime": "2018-02-27T23:43:56Z",
+			"version": "v1",
+			"versionExact": "v1.9.1"
+		},
+		{
+			"checksumSHA1": "4eelJOSLZoDzLuaJvgilOBVNovU=",
+			"path": "github.com/jinzhu/inflection",
+			"revision": "04140366298a54a039076d798123ffa108fff46c",
+			"revisionTime": "2018-03-08T03:36:59Z"
+		},
+		{
+			"checksumSHA1": "z+O5JNjzHISYP1V+1v6SAKkrz7M=",
+			"path": "github.com/mattn/go-sqlite3",
+			"revision": "6c771bb9887719704b210e87e934f08be014bdb1",
+			"revisionTime": "2018-01-12T08:58:26Z",
+			"version": "v1",
+			"versionExact": "v1.6.0"
+		},
+		{
 			"checksumSHA1": "GWtDi0sYbtCQzF/ZaVhaHvCMvuk=",
 			"path": "github.com/sirupsen/logrus",
 			"revision": "c155da19408a8799da419ed3eeb0cb5db0ad5dbc",
