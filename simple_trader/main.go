@@ -31,12 +31,17 @@ func main() {
 
 	trader.AddExchange(exchanges.NewDummyExchange())
 
-	logrus.Infoln("Start")
-	trader.Start()
+	logrus.Infoln("Start", trader)
+	if e := trader.Start(); e != nil {
+		logrus.Infoln("Failed to start", trader, ". Caused by: ", e)
+		os.Exit(1)
+	}
 
-	logrus.Infoln("Wait")
 	<-stop
 
-	logrus.Infoln("Stop")
-	trader.Stop()
+	logrus.Infoln("Stop", trader)
+	if e := trader.Stop(); e != nil {
+		logrus.Infoln("Failed to stop", trader, ". Caused by: ", e)
+		os.Exit(1)
+	}
 }
