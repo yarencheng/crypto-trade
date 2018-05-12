@@ -5,9 +5,11 @@ go:
 
 install:
   - go get -u github.com/kardianos/govendor
-  - govendor sync
+  - govendor sync -v
 
 script:
-  - govendor test +local
-  - govendor install +local
+  - go test -v .
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
   
