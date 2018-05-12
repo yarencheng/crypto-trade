@@ -3,42 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "igSbcP9QO8tVcBVaBEVMiL7ogxg=",
-			"path": "github.com/bitfinexcom/bitfinex-api-go",
-			"revision": "7bd201d7406c754338bb39fe2e828724a710ee81",
-			"revisionTime": "2018-04-18T19:09:14Z"
-		},
-		{
-			"checksumSHA1": "hEnH6sgR83Qfx7UNnphNNlelmj0=",
-			"path": "github.com/gorilla/websocket",
-			"revision": "ea4d1f681babbce9545c9c5f3d5194a789c89f5b",
-			"revisionTime": "2017-06-20T19:01:03Z",
-			"version": "v1",
-			"versionExact": "v1.2.0"
-		},
-		{
-			"checksumSHA1": "IPuI0TCUlOnJGLYWyJDDH6xbtZg=",
-			"path": "github.com/jinzhu/gorm",
-			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
-			"revisionTime": "2018-02-27T23:43:56Z",
-			"version": "v1",
-			"versionExact": "v1.9.1"
-		},
-		{
-			"checksumSHA1": "4eelJOSLZoDzLuaJvgilOBVNovU=",
-			"path": "github.com/jinzhu/inflection",
-			"revision": "04140366298a54a039076d798123ffa108fff46c",
-			"revisionTime": "2018-03-08T03:36:59Z"
-		},
-		{
-			"checksumSHA1": "z+O5JNjzHISYP1V+1v6SAKkrz7M=",
-			"path": "github.com/mattn/go-sqlite3",
-			"revision": "6c771bb9887719704b210e87e934f08be014bdb1",
-			"revisionTime": "2018-01-12T08:58:26Z",
-			"version": "v1",
-			"versionExact": "v1.6.0"
-		},
-		{
 			"checksumSHA1": "GWtDi0sYbtCQzF/ZaVhaHvCMvuk=",
 			"path": "github.com/sirupsen/logrus",
 			"revision": "c155da19408a8799da419ed3eeb0cb5db0ad5dbc",
@@ -49,20 +13,20 @@
 		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
 			"path": "golang.org/x/crypto/ssh/terminal",
-			"revision": "d6449816ce06963d9d136eee5a56fca5b0616e7e",
-			"revisionTime": "2018-04-11T15:42:50Z"
+			"revision": "2d027ae1dddd4694d54f7a8b6cbe78dca8720226",
+			"revisionTime": "2018-05-09T20:48:04Z"
 		},
 		{
-			"checksumSHA1": "31n/IvwJf+PtXWf1EPwQYcde1jY=",
+			"checksumSHA1": "qCuKXLGOd2PedjXMLl7sSuxbZiI=",
 			"path": "golang.org/x/sys/unix",
-			"revision": "b126b21c05a91c856b027c16779c12e3bf236954",
-			"revisionTime": "2018-04-16T10:06:24Z"
+			"revision": "d0faeb539838e250bd0a9db4182d48d4a1915181",
+			"revisionTime": "2018-05-11T14:37:04Z"
 		},
 		{
-			"checksumSHA1": "Dfz4tGItokMvHZENCsBmPPB8FGQ=",
+			"checksumSHA1": "+mZiO0TdI05VboObjo18vs4sEbg=",
 			"path": "golang.org/x/sys/windows",
-			"revision": "b126b21c05a91c856b027c16779c12e3bf236954",
-			"revisionTime": "2018-04-16T10:06:24Z"
+			"revision": "d0faeb539838e250bd0a9db4182d48d4a1915181",
+			"revisionTime": "2018-05-11T14:37:04Z"
 		}
 	],
 	"rootPath": "github.com/yarencheng/crypto-trade"
