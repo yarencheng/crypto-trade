@@ -1,11 +1,12 @@
 package data
 
-import "github.com/yarencheng/crypto-trade/data/currencies"
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type Order struct {
-	From currencies.Currency
-	To   currencies.Currency
+	From Currency
+	To   Currency
 }
 
 func (o Order) String() string {

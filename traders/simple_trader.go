@@ -7,13 +7,13 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"github.com/yarencheng/crypto-trade/data/currencies"
+	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchanges"
 	"github.com/yarencheng/crypto-trade/tasks"
 )
 
 type SimpleTrader struct {
-	exchanges  []exchanges.Exchange
+	Exchanges  []exchanges.ExchangeI
 	status     tasks.Status
 	statusLock sync.Mutex
 	stop       chan int
@@ -36,8 +36,8 @@ func (trader *SimpleTrader) String() string {
 	return fmt.Sprintf("SimpleTrader[@%p]", trader)
 }
 
-func (trader *SimpleTrader) AddExchange(exchange exchanges.Exchange) {
-	trader.exchanges = append(trader.exchanges, exchange)
+func (trader *SimpleTrader) AddExchange(exchange exchanges.ExchangeI) {
+	trader.Exchanges = append(trader.Exchanges, exchange)
 }
 
 func (trader *SimpleTrader) GetStatus() tasks.Status {
@@ -47,11 +47,12 @@ func (trader *SimpleTrader) GetStatus() tasks.Status {
 }
 
 func (trader *SimpleTrader) Start() error {
-
+	logrus.Errorln("aaa 1")
 	trader.statusLock.Lock()
 	if trader.status != tasks.Pending {
 		s := fmt.Sprint(trader, "is not pending")
 		logrus.Warnln(s)
+		logrus.Errorln("aaa 2")
 		return errors.New(s)
 	}
 	trader.status = tasks.Running
@@ -59,10 +60,10 @@ func (trader *SimpleTrader) Start() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	for _, ex := range trader.exchanges {
+	for _, ex := range trader.Exchanges {
 
 		go func() {
-			orders, _ := ex.GetOrders(currencies.BTC, currencies.ETH)
+			orders, _ := ex.GetOrders(data.BTC, data.ETH)
 			for {
 				select {
 				case order := <-orders:
@@ -81,7 +82,7 @@ func (trader *SimpleTrader) Start() error {
 		trader.status = tasks.Stopped
 		trader.statusLock.Unlock()
 	}()
-
+	logrus.Errorln("aaa 3")
 	return nil
 }
 

@@ -11,6 +11,14 @@
 			"versionExact": "v1.0.5"
 		},
 		{
+			"checksumSHA1": "72mJEBp0RvYu8DBoBD6JVMPVFNA=",
+			"path": "github.com/yarencheng/gospring",
+			"revision": "6340a967bd7854392b3e1f107ce87153881b7406",
+			"revisionTime": "2018-05-13T17:15:25Z",
+			"version": "v1",
+			"versionExact": "v1.0.1"
+		},
+		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
 			"path": "golang.org/x/crypto/ssh/terminal",
 			"revision": "2d027ae1dddd4694d54f7a8b6cbe78dca8720226",

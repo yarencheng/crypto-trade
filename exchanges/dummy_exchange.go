@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/yarencheng/crypto-trade/data"
-	"github.com/yarencheng/crypto-trade/data/currencies"
 )
 
 type DummyExchange struct {
@@ -23,15 +22,15 @@ func (ex *DummyExchange) Ping() float64 {
 	return 0
 }
 
-func (ex *DummyExchange) GetOrders(from currencies.Currency, to currencies.Currency) (chan data.Order, error) {
+func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (chan data.Order, error) {
 
 	c := make(chan data.Order)
 
 	go func() {
 		for {
 			c <- data.Order{
-				From: currencies.BTC,
-				To:   currencies.ETH,
+				From: data.BTC,
+				To:   data.ETH,
 			}
 			time.Sleep(time.Second)
 		}

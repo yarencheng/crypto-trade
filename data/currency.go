@@ -1,4 +1,4 @@
-package currencies
+package data
 
 type Currency string
 
