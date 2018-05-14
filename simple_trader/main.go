@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/yarencheng/crypto-trade/exchanges"
+	"github.com/yarencheng/crypto-trade/strategies"
 	"github.com/yarencheng/crypto-trade/traders"
 	gs "github.com/yarencheng/gospring"
 )
@@ -31,10 +32,15 @@ func main() {
 			Init("Start").
 			Finalize("Stop").
 			Factory(traders.NewSimpleTrader).
-			Property("Exchanges", gs.Ref("dummy_exchange")),
+			Property("Exchanges", gs.Ref("dummy_exchange")).
+			Property("Strategy", gs.Ref("stupid_strategy")),
 		gs.Bean(exchanges.DummyExchange{}).
 			ID("dummy_exchange").
 			Singleton(),
+		gs.Bean(strategies.StupidStrategy{}).
+			ID("stupid_strategy").
+			Singleton().
+			Factory(strategies.NewStupidStrategy),
 	)
 
 	ctx, e := gs.NewApplicationContext(beans...)

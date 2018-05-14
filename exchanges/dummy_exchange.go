@@ -22,7 +22,7 @@ func (ex *DummyExchange) Ping() float64 {
 	return 0
 }
 
-func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (chan data.Order, error) {
+func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (<-chan data.Order, error) {
 
 	c := make(chan data.Order)
 
@@ -37,4 +37,10 @@ func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (chan d
 	}()
 
 	return c, nil
+}
+
+func (ex *DummyExchange) Buy(from data.Order) chan data.TradeResult {
+	c := make(chan data.TradeResult)
+	c <- data.TradeResult{IsSucess: true}
+	return c
 }

@@ -7,10 +7,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchanges"
+	"github.com/yarencheng/crypto-trade/strategies"
 )
 
 type SimpleTrader struct {
 	Exchanges []exchanges.ExchangeI
+	Strategy  strategies.StrategyI
 	stop      chan int
 }
 
@@ -27,10 +29,6 @@ func (trader *SimpleTrader) String() string {
 	return fmt.Sprintf("SimpleTrader[@%p]", trader)
 }
 
-func (trader *SimpleTrader) AddExchange(exchange exchanges.ExchangeI) {
-	trader.Exchanges = append(trader.Exchanges, exchange)
-}
-
 func (trader *SimpleTrader) Start() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -39,6 +37,7 @@ func (trader *SimpleTrader) Start() error {
 
 		go func() {
 			orders, _ := ex.GetOrders(data.BTC, data.ETH)
+
 			for {
 				select {
 				case order := <-orders:
