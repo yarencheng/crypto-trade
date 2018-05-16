@@ -29,25 +29,44 @@ func (trader *SimpleTrader) String() string {
 	return fmt.Sprintf("SimpleTrader[@%p]", trader)
 }
 
-func (trader *SimpleTrader) Start() error {
+func (trader *SimpleTrader) Init() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	for _, ex := range trader.Exchanges {
-
 		go func() {
+			pipe := make(chan data.Order, 10)
+			trader.Strategy.In(pipe)
 			orders, _ := ex.GetOrders(data.BTC, data.ETH)
 
 			for {
 				select {
 				case order := <-orders:
-					logrus.Infoln("Get order", order)
+					//logrus.Debugln("Get order", order)
+					pipe <- order
 				case <-ctx.Done():
+					// close(pipe)
 					break
 				}
 			}
 		}()
 	}
+
+	go func() {
+		buys, _ := trader.Strategy.Out()
+
+		for {
+			select {
+			case buy := <-buys:
+				logrus.Infoln("Buy order", buy)
+				for _, ex := range trader.Exchanges {
+					ex.Buy(buy)
+				}
+			case <-ctx.Done():
+				break
+			}
+		}
+	}()
 
 	go func() {
 		<-trader.stop
@@ -56,7 +75,7 @@ func (trader *SimpleTrader) Start() error {
 	return nil
 }
 
-func (trader *SimpleTrader) Stop() error {
+func (trader *SimpleTrader) Finalize() error {
 
 	trader.stop <- 0
 

@@ -29,14 +29,13 @@ func main() {
 		gs.Bean(traders.SimpleTrader{}).
 			ID("trader").
 			Singleton().
-			Init("Start").
-			Finalize("Stop").
 			Factory(traders.NewSimpleTrader).
 			Property("Exchanges", gs.Ref("dummy_exchange")).
 			Property("Strategy", gs.Ref("stupid_strategy")),
 		gs.Bean(exchanges.DummyExchange{}).
 			ID("dummy_exchange").
-			Singleton(),
+			Singleton().
+			Factory(exchanges.NewDummyExchange),
 		gs.Bean(strategies.StupidStrategy{}).
 			ID("stupid_strategy").
 			Singleton().
