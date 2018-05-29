@@ -1,6 +1,9 @@
 package strategies
 
 import (
+	"context"
+	"sync"
+
 	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/logger"
 )
@@ -8,25 +11,41 @@ import (
 var log = logger.Get("stupid_strategy.go")
 
 type StupidStrategy struct {
-	orders chan data.Order
+	stopContext context.Context
+	stopCancel  context.CancelFunc
+	stopWG      sync.WaitGroup
+	LiveOrders  <-chan data.Order
 }
 
 func NewStupidStrategy() *StupidStrategy {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &StupidStrategy{
-		orders: make(chan data.Order, 10),
+		stopContext: ctx,
+		stopCancel:  cancel,
 	}
 }
 
-func (s *StupidStrategy) In(orders <-chan data.Order) error {
+func (st *StupidStrategy) Init() {
+	log.Infoln("Starting")
+
 	go func() {
-		for order := range orders {
-			log.Infoln("Get order aaaa", order)
-			s.orders <- order
+		defer st.stopWG.Done()
+		for {
+			select {
+			case <-st.stopContext.Done():
+				return
+			case order := <-st.LiveOrders:
+				log.Infoln("Get order ", order)
+			}
 		}
 	}()
-	return nil
+
+	log.Infoln("Started")
 }
 
-func (s *StupidStrategy) Out() (<-chan data.Order, error) {
-	return s.orders, nil
+func (st *StupidStrategy) Finalize() {
+	log.Infoln("Stopping")
+	st.stopCancel()
+	st.stopWG.Wait()
+	log.Infoln("stopped")
 }

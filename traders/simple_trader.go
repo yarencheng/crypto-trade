@@ -1,10 +1,8 @@
 package traders
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchanges"
 	"github.com/yarencheng/crypto-trade/logger"
 	"github.com/yarencheng/crypto-trade/strategies"
@@ -34,27 +32,27 @@ func (trader *SimpleTrader) String() string {
 
 func (trader *SimpleTrader) Init() error {
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
 
-	for _, ex := range trader.Exchanges {
-		orders, _ := ex.GetOrders(data.BTC, data.ETH)
+	// for _, ex := range trader.Exchanges {
+	// 	orders, _ := ex.GetOrders(data.BTC, data.ETH)
 
-		go func() {
-			for {
-				select {
-				case order := <-orders:
-					log.Infoln("Get order", order)
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}
+	// 	go func() {
+	// 		for {
+	// 			select {
+	// 			case order := <-orders:
+	// 				log.Infoln("Get order", order)
+	// 			case <-ctx.Done():
+	// 				return
+	// 			}
+	// 		}
+	// 	}()
+	// }
 
-	go func() {
-		<-trader.stop
-		cancel()
-	}()
+	// go func() {
+	// 	<-trader.stop
+	// 	cancel()
+	// }()
 	return nil
 }
 

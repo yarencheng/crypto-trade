@@ -16,6 +16,7 @@ type DummyExchange struct {
 	stopCancel  context.CancelFunc
 	stopWG      sync.WaitGroup
 	delayMs     int64
+	LiveOrders  chan<- data.Order
 }
 
 func NewDummyExchange(delayMs int64) *DummyExchange {
@@ -27,28 +28,10 @@ func NewDummyExchange(delayMs int64) *DummyExchange {
 	}
 }
 
-func (ex *DummyExchange) GetName() string {
-	return "Dummy Exchange"
-}
-
-func (ex *DummyExchange) Ping() float64 {
-	return 0
-}
-
-func (ex *DummyExchange) Finalize() {
-	log.Infoln("Stopping")
-	ex.stopCancel()
-	ex.stopWG.Wait()
-	log.Infoln("stopped")
-}
-
-func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (<-chan data.Order, error) {
-
-	c := make(chan data.Order, 10)
-	ex.stopWG.Add(1)
+func (ex *DummyExchange) Init() {
+	log.Infoln("Starting")
 
 	go func() {
-		defer close(c)
 		defer ex.stopWG.Done()
 		for {
 			order := data.Order{
@@ -58,19 +41,19 @@ func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (<-chan
 			select {
 			case <-ex.stopContext.Done():
 				return
-			case c <- order:
+			case ex.LiveOrders <- order:
 				log.Infoln("Send order", order)
-				log.Debugln("Send order", order)
 				time.Sleep(time.Duration(ex.delayMs) * time.Millisecond)
 			}
 		}
 	}()
 
-	return c, nil
+	log.Infoln("Started")
 }
 
-func (ex *DummyExchange) Buy(from data.Order) chan data.TradeResult {
-	c := make(chan data.TradeResult)
-	c <- data.TradeResult{IsSucess: true}
-	return c
+func (ex *DummyExchange) Finalize() {
+	log.Infoln("Stopping")
+	ex.stopCancel()
+	ex.stopWG.Wait()
+	log.Infoln("stopped")
 }
