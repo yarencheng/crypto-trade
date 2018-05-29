@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchanges"
+	"github.com/yarencheng/crypto-trade/logger"
 	"github.com/yarencheng/crypto-trade/strategies"
 )
+
+// var log = logrus.New().WithField("file", "simple_trader.go")
+var log = logger.Get("simple_trader.go")
 
 type SimpleTrader struct {
 	Exchanges []exchanges.ExchangeI
@@ -34,39 +37,19 @@ func (trader *SimpleTrader) Init() error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	for _, ex := range trader.Exchanges {
-		go func() {
-			pipe := make(chan data.Order, 10)
-			trader.Strategy.In(pipe)
-			orders, _ := ex.GetOrders(data.BTC, data.ETH)
+		orders, _ := ex.GetOrders(data.BTC, data.ETH)
 
+		go func() {
 			for {
 				select {
 				case order := <-orders:
-					//logrus.Debugln("Get order", order)
-					pipe <- order
+					log.Infoln("Get order", order)
 				case <-ctx.Done():
-					// close(pipe)
-					break
+					return
 				}
 			}
 		}()
 	}
-
-	go func() {
-		buys, _ := trader.Strategy.Out()
-
-		for {
-			select {
-			case buy := <-buys:
-				logrus.Infoln("Buy order", buy)
-				for _, ex := range trader.Exchanges {
-					ex.Buy(buy)
-				}
-			case <-ctx.Done():
-				break
-			}
-		}
-	}()
 
 	go func() {
 		<-trader.stop

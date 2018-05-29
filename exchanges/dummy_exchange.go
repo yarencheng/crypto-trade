@@ -1,21 +1,29 @@
 package exchanges
 
 import (
-	"container/list"
+	"context"
 	"sync"
 	"time"
 
 	"github.com/yarencheng/crypto-trade/data"
+	"github.com/yarencheng/crypto-trade/logger"
 )
 
+var log = logger.Get("dummy_exchange.go")
+
 type DummyExchange struct {
-	outOrders      *list.List
-	outOrdersMutex sync.Mutex
+	stopContext context.Context
+	stopCancel  context.CancelFunc
+	stopWG      sync.WaitGroup
+	delayMs     int64
 }
 
-func NewDummyExchange() *DummyExchange {
+func NewDummyExchange(delayMs int64) *DummyExchange {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &DummyExchange{
-		outOrders: list.New(),
+		stopContext: ctx,
+		stopCancel:  cancel,
+		delayMs:     delayMs,
 	}
 }
 
@@ -28,35 +36,32 @@ func (ex *DummyExchange) Ping() float64 {
 }
 
 func (ex *DummyExchange) Finalize() {
-	ex.outOrdersMutex.Lock()
-	defer ex.outOrdersMutex.Unlock()
-
-	c := ex.outOrders.Front()
-	for c != nil {
-		c.Value.(chan int) <- 0
-		c = c.Next()
-	}
+	log.Infoln("Stopping")
+	ex.stopCancel()
+	ex.stopWG.Wait()
+	log.Infoln("stopped")
 }
 
 func (ex *DummyExchange) GetOrders(from data.Currency, to data.Currency) (<-chan data.Order, error) {
 
 	c := make(chan data.Order, 10)
-	stop := make(chan int)
-
-	ex.outOrdersMutex.Lock()
-	ex.outOrders.PushBack(stop)
-	ex.outOrdersMutex.Unlock()
+	ex.stopWG.Add(1)
 
 	go func() {
+		defer close(c)
+		defer ex.stopWG.Done()
 		for {
-			select {
-			case c <- data.Order{
+			order := data.Order{
 				From: data.BTC,
 				To:   data.ETH,
-			}:
-				time.Sleep(time.Second)
-			case <-stop:
-				break
+			}
+			select {
+			case <-ex.stopContext.Done():
+				return
+			case c <- order:
+				log.Infoln("Send order", order)
+				log.Debugln("Send order", order)
+				time.Sleep(time.Duration(ex.delayMs) * time.Millisecond)
 			}
 		}
 	}()

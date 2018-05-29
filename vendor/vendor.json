@@ -3,6 +3,24 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "SEnjvwVyfuU2xBaOfXfwPD5MZqk=",
+			"path": "github.com/mattn/go-colorable",
+			"revision": "efa589957cd060542a26d2dd7832fd6a6c6c3ade",
+			"revisionTime": "2018-03-10T13:32:14Z"
+		},
+		{
+			"checksumSHA1": "w5RcOnfv5YDr3j2bd1YydkPiZx4=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c",
+			"revisionTime": "2017-11-07T05:05:31Z"
+		},
+		{
+			"checksumSHA1": "CIK3BBNX3nuUQCmNqTQydNfMNKI=",
+			"path": "github.com/mgutz/ansi",
+			"revision": "9520e82c474b0a04dd04f8a40959027271bab992",
+			"revisionTime": "2017-02-06T15:57:36Z"
+		},
+		{
 			"checksumSHA1": "GWtDi0sYbtCQzF/ZaVhaHvCMvuk=",
 			"path": "github.com/sirupsen/logrus",
 			"revision": "c155da19408a8799da419ed3eeb0cb5db0ad5dbc",
@@ -11,12 +29,20 @@
 			"versionExact": "v1.0.5"
 		},
 		{
-			"checksumSHA1": "oy+CGJyeDl/bsRQWNl5xQNtmvuI=",
+			"checksumSHA1": "L1vKtjhZ2Lej0kfsLaTUm7ps/Yg=",
+			"path": "github.com/x-cray/logrus-prefixed-formatter",
+			"revision": "bb2702d423886830dee131692131d35648c382e2",
+			"revisionTime": "2017-07-31T09:11:26Z",
+			"version": "v0",
+			"versionExact": "v0.5.2"
+		},
+		{
+			"checksumSHA1": "FJjOKIu5GsMXmB6xjCMasckcmuY=",
 			"path": "github.com/yarencheng/gospring",
-			"revision": "945027ea272d0f3780d776df4cb93511d4411f24",
-			"revisionTime": "2018-05-15T12:55:31Z",
+			"revision": "4d052bbfc1affd3b59b765fcf86c481593f25231",
+			"revisionTime": "2018-05-26T19:25:06Z",
 			"version": "v1",
-			"versionExact": "v1.0.2"
+			"versionExact": "v1.1.0"
 		},
 		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
