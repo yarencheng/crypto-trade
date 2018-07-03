@@ -37,12 +37,12 @@
 			"versionExact": "v0.5.2"
 		},
 		{
-			"checksumSHA1": "FJjOKIu5GsMXmB6xjCMasckcmuY=",
+			"checksumSHA1": "q9zaM5oBTh+Fo5We5h+qLUfHe+M=",
 			"path": "github.com/yarencheng/gospring",
-			"revision": "4d052bbfc1affd3b59b765fcf86c481593f25231",
-			"revisionTime": "2018-05-26T19:25:06Z",
-			"version": "v1",
-			"versionExact": "v1.1.0"
+			"revision": "08ca802051fcbd8d2abd22e4af4e1c672152d5a0",
+			"revisionTime": "2018-07-02T17:07:10Z",
+			"version": "develop-v2.0",
+			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",

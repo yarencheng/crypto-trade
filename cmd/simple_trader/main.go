@@ -5,12 +5,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/yarencheng/crypto-trade/data"
+	"github.com/yarencheng/gospring/v1"
+
 	"github.com/yarencheng/crypto-trade/exchanges"
 	"github.com/yarencheng/crypto-trade/logger"
 	"github.com/yarencheng/crypto-trade/strategies"
 	"github.com/yarencheng/crypto-trade/traders"
 	gs "github.com/yarencheng/gospring"
+	"github.com/yarencheng/gospring/application_context"
 )
 
 var log = logger.Get("main.go")
@@ -55,41 +57,22 @@ func main1() {
 
 func main() {
 
-	beans := gs.Beans(
-		gs.Bean(exchanges.DummyExchange{}).
-			ID("dummy_exchange").
-			Singleton().
-			Factory(exchanges.NewDummyExchange, int64(1000)).
-			Property("LiveOrders", gs.Ref("live_orders")),
-		gs.Bean(strategies.StupidStrategy{}).
-			ID("stupid_strategy").
-			Singleton().
-			Factory(strategies.NewStupidStrategy).
-			Property("LiveOrders", gs.Ref("live_orders")),
-		gs.Chan(data.Order{}, 10).ID("live_orders"),
-	)
+	ctx := application_context.Default()
 
-	ctx, e := gs.NewApplicationContext(beans...)
-	if e != nil {
-		log.Errorln("Can't create gospring contex. Caused by:", e)
-	}
-	defer ctx.Finalize()
+	err := ctx.AddConfigs(&v1.Bean{
+		ID:          "dummy_exchange",
+		Type:        v1.T(exchanges.DummyExchange{}),
+		FactoryFn:   exchanges.NewDummyExchange,
+		FactoryArgs: []interface{}{int64(1000)},
+	})
 
-	_, e = ctx.GetBean("dummy_exchange")
-
-	if e != nil {
-		log.Errorln("Can't create dummy_exchange. Caused by:", e)
-	}
-
-	_, e = ctx.GetBean("stupid_strategy")
-
-	if e != nil {
-		log.Errorln("Can't create stupid_strategy. Caused by:", e)
+	if err != nil {
+		log.Fatalf("Add configs to ctx failed. err: [%v]", err)
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	<-stop
-	log.Infoln("Stop trader")
+	s := <-stop
+	log.Infoln("Stopped by signal [%v]", s)
 }
