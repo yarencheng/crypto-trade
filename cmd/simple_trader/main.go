@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/yarencheng/gospring/v1"
 
@@ -58,7 +59,10 @@ func main() {
 
 	s := <-stop
 
-	err = ctx.Stop(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = ctx.Stop(ctx)
 	if err != nil {
 		log.Fatalf("Stop ctx failed. err: [%v]", err)
 	}
