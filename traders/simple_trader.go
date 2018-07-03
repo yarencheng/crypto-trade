@@ -3,7 +3,7 @@ package traders
 import (
 	"fmt"
 
-	"github.com/yarencheng/crypto-trade/exchanges"
+	"github.com/yarencheng/crypto-trade/exchange"
 	"github.com/yarencheng/crypto-trade/logger"
 	"github.com/yarencheng/crypto-trade/strategies"
 )
@@ -12,7 +12,7 @@ import (
 var log = logger.Get("simple_trader.go")
 
 type SimpleTrader struct {
-	Exchanges []exchanges.ExchangeI
+	Exchanges []exchange.ExchangeI
 	Strategy  strategies.StrategyI
 	stop      chan int
 }
