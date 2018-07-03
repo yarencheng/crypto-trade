@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/yarencheng/gospring/v1"
 
+	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchange/dummy"
 	"github.com/yarencheng/crypto-trade/logger"
 	"github.com/yarencheng/gospring/application_context"
@@ -19,10 +21,27 @@ func main() {
 	ctx := application_context.Default()
 
 	err := ctx.AddConfigs(&v1.Bean{
-		ID:         "dummy_exchange",
-		Type:       v1.T(dummy.Dummy{}),
-		FactoryFn:  dummy.New,
-		Properties: []v1.Property{},
+		ID:        "dummy_exchange",
+		Type:      v1.T(dummy.Dummy{}),
+		FactoryFn: dummy.New,
+		Properties: []v1.Property{
+			{
+				Name:   "DelayMs",
+				Config: v1.V(int64(1000)),
+			},
+			{
+				Name:   "LiveOrders",
+				Config: "ordersBroadcast",
+			},
+		},
+	}, &v1.Channel{
+		ID:   "orders",
+		Type: v1.T(data.Order{}),
+		Size: 10,
+	}, &v1.Broadcast{
+		ID:       "ordersBroadcast",
+		SourceID: "orders",
+		Size:     10,
 	})
 
 	if err != nil {
@@ -38,5 +57,11 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	s := <-stop
-	log.Infoln("Stopped by signal [%v]", s)
+
+	err = ctx.Stop(context.Background())
+	if err != nil {
+		log.Fatalf("Stop ctx failed. err: [%v]", err)
+	}
+
+	log.Infof("Stopped by signal [%v].\n", s)
 }

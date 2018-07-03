@@ -1,6 +1,7 @@
 package dummy
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,5 +22,8 @@ func TestSss(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = ctx.GetByID("dummy_exchange")
+	require.NoError(t, err)
+
+	err = ctx.Stop(context.Background())
 	require.NoError(t, err)
 }
