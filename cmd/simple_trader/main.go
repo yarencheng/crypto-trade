@@ -12,6 +12,7 @@ import (
 	"github.com/yarencheng/crypto-trade/data"
 	"github.com/yarencheng/crypto-trade/exchange/dummy"
 	"github.com/yarencheng/crypto-trade/logger"
+	"github.com/yarencheng/crypto-trade/strategies"
 	"github.com/yarencheng/gospring/application_context"
 )
 
@@ -30,6 +31,26 @@ func main() {
 				Name:   "DelayMs",
 				Config: v1.V(int64(1000)),
 			},
+			{
+				Name:   "LiveOrders",
+				Config: "orders",
+			},
+		},
+	}, &v1.Bean{
+		ID:        "stupid_strategy_1",
+		Type:      v1.T(strategies.StupidStrategy{}),
+		FactoryFn: strategies.New,
+		Properties: []v1.Property{
+			{
+				Name:   "LiveOrders",
+				Config: "ordersBroadcast",
+			},
+		},
+	}, &v1.Bean{
+		ID:        "stupid_strategy_2",
+		Type:      v1.T(strategies.StupidStrategy{}),
+		FactoryFn: strategies.New,
+		Properties: []v1.Property{
 			{
 				Name:   "LiveOrders",
 				Config: "ordersBroadcast",
@@ -54,18 +75,37 @@ func main() {
 		log.Fatalf("Failed to get dummy_exchange. err: [%v]", err)
 	}
 
+	_, err = ctx.GetByID("stupid_strategy_1")
+	if err != nil {
+		log.Fatalf("Failed to get stupid_strategy_1. err: [%v]", err)
+	}
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	s := <-stop
+	log.Infof("Stopped by signal [%v].\n", s)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	b, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err = ctx.Stop(ctx)
-	if err != nil {
-		log.Fatalf("Stop ctx failed. err: [%v]", err)
+	wait := make(chan int, 1)
+	go func() {
+		err = ctx.Stop(b)
+		if err != nil {
+			log.Fatalf("Stop ctx failed. err: [%v]", err)
+		}
+		wait <- 1
+	}()
+
+	select {
+	case <-b.Done():
+	case <-wait:
 	}
 
-	log.Infof("Stopped by signal [%v].\n", s)
+	if err := b.Err(); err != nil {
+		log.Fatalf("Stop failed. err: [%v]", err)
+	}
+
+	log.Infof("Stopped.")
 }

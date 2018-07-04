@@ -20,7 +20,7 @@ type Dummy struct {
 
 func New() *Dummy {
 	return &Dummy{
-		stop:    make(chan int),
+		stop:    make(chan int, 1),
 		DelayMs: 1000,
 	}
 }

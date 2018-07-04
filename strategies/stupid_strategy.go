@@ -11,28 +11,27 @@ import (
 var log = logger.Get("stupid_strategy.go")
 
 type StupidStrategy struct {
-	stopContext context.Context
-	stopCancel  context.CancelFunc
-	stopWG      sync.WaitGroup
-	LiveOrders  <-chan data.Order
+	stop       chan int
+	wg         sync.WaitGroup
+	LiveOrders <-chan data.Order
 }
 
-func NewStupidStrategy() *StupidStrategy {
-	ctx, cancel := context.WithCancel(context.Background())
+func New() *StupidStrategy {
 	return &StupidStrategy{
-		stopContext: ctx,
-		stopCancel:  cancel,
+		stop: make(chan int, 1),
 	}
 }
 
-func (st *StupidStrategy) Init() {
+func (st *StupidStrategy) Start() {
 	log.Infoln("Starting")
 
+	st.wg.Add(1)
 	go func() {
-		defer st.stopWG.Done()
+		defer st.wg.Done()
 		for {
 			select {
-			case <-st.stopContext.Done():
+			case <-st.stop:
+				log.Infoln("aaaa stop ")
 				return
 			case order := <-st.LiveOrders:
 				log.Infoln("Get order ", order)
@@ -43,9 +42,24 @@ func (st *StupidStrategy) Init() {
 	log.Infoln("Started")
 }
 
-func (st *StupidStrategy) Finalize() {
+func (st *StupidStrategy) Stop(ctx context.Context) error {
 	log.Infoln("Stopping")
-	st.stopCancel()
-	st.stopWG.Wait()
-	log.Infoln("stopped")
+
+	wg := sync.WaitGroup{}
+	wait := make(chan int)
+
+	wg.Add(1)
+	go func() {
+		close(st.stop)
+		st.wg.Wait()
+		close(wait)
+	}()
+
+	select {
+	case <-ctx.Done():
+	case <-wait:
+		log.Infoln("Stopped")
+	}
+
+	return ctx.Err()
 }
