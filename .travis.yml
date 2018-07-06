@@ -5,16 +5,11 @@ sudo: required
 services:
   - docker
 
-before_install:
-  - cd go
-  - go get -u github.com/kardianos/govendor
-
-install:
-  - govendor sync -v
-
-script:
-  - go test -v -race -coverprofile=coverage.txt -covermode=atomic
-
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
-
+jobs:
+  include:
+    - stage: aa
+      script: echo aa 1
+    - stage: aa
+      script: echo aa 2
+    - stage: bb
+      script: echo bb
