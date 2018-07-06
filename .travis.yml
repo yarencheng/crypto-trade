@@ -3,13 +3,15 @@ language: go
 go:
   - "1.10"
 
+before_install:
+  - go get -u github.com/kardianos/govendor
+
 install:
   - go get -u github.com/kardianos/govendor
-  - govendor sync -v
 
 script:
-  - go test -v ./...
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
-  
+
