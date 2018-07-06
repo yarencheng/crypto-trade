@@ -1,16 +1,18 @@
 language: go
-
 go:
   - "1.10"
+sudo: required
+services:
+  - docker
 
 before_install:
-  - go get -u github.com/kardianos/govendor
+  - cd go && go get -u github.com/kardianos/govendor
 
 install:
-  - go get -u github.com/kardianos/govendor
+  - cd go && govendor sync -v
 
 script:
-  - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - cd go && go test -v -race -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
