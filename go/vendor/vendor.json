@@ -83,40 +83,40 @@
 		{
 			"checksumSHA1": "BqEWhj+0N2ziyIfIu/CVb+4sd+g=",
 			"path": "github.com/yarencheng/gospring/applicationcontext",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
+			"revision": "35bbe04971a23426aa6e69e3b6a1860bd3379960",
+			"revisionTime": "2018-07-06T16:05:11Z",
 			"version": "develop-v2.0",
 			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "OczxjDoCCsm18vxuwLNggBgDgbY=",
 			"path": "github.com/yarencheng/gospring/bean",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
+			"revision": "35bbe04971a23426aa6e69e3b6a1860bd3379960",
+			"revisionTime": "2018-07-06T16:05:11Z",
 			"version": "develop-v2.0",
 			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "fPO8KRHed73GmGLL9yhW4VOfOBw=",
 			"path": "github.com/yarencheng/gospring/bean/value",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
+			"revision": "35bbe04971a23426aa6e69e3b6a1860bd3379960",
+			"revisionTime": "2018-07-06T16:05:11Z",
 			"version": "develop-v2.0",
 			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "Z0t8T2TtP66OwyDr2dMdpK+PaME=",
 			"path": "github.com/yarencheng/gospring/interfaces",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
+			"revision": "35bbe04971a23426aa6e69e3b6a1860bd3379960",
+			"revisionTime": "2018-07-06T16:05:11Z",
 			"version": "develop-v2.0",
 			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "cDZsFPErtXQaEOQyx/uTnR30XeI=",
 			"path": "github.com/yarencheng/gospring/v1",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
+			"revision": "35bbe04971a23426aa6e69e3b6a1860bd3379960",
+			"revisionTime": "2018-07-06T16:05:11Z",
 			"version": "develop-v2.0",
 			"versionExact": "develop-v2.0"
 		},
