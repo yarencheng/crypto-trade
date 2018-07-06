@@ -6,13 +6,14 @@ services:
   - docker
 
 before_install:
-  - cd go && go get -u github.com/kardianos/govendor
+  - cd go
+  - go get -u github.com/kardianos/govendor
 
 install:
-  - cd go && govendor sync -v
+  - govendor sync -v
 
 script:
-  - cd go && go test -v -race -coverprofile=coverage.txt -covermode=atomic
+  - go test -v -race -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
