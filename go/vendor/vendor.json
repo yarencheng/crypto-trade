@@ -123,21 +123,21 @@
 		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
 			"path": "golang.org/x/crypto/ssh/terminal",
-			"revision": "2d027ae1dddd4694d54f7a8b6cbe78dca8720226",
-			"revisionTime": "2018-05-09T20:48:04Z"
+			"revision": "a49355c7e3f8fe157a85be2f77e6e269a0f89602",
+			"revisionTime": "2018-06-20T09:14:27Z"
 		},
 		{
-			"checksumSHA1": "qCuKXLGOd2PedjXMLl7sSuxbZiI=",
+			"checksumSHA1": "V/UdNDcjpscRWgVPbJTQamlYdh0=",
 			"path": "golang.org/x/sys/unix",
-			"revision": "d0faeb539838e250bd0a9db4182d48d4a1915181",
-			"revisionTime": "2018-05-11T14:37:04Z"
+			"revision": "ce36f3865eeb42541ce3f87f32f8462c5687befa",
+			"revisionTime": "2018-07-05T15:01:54Z"
 		},
 		{
-			"checksumSHA1": "+mZiO0TdI05VboObjo18vs4sEbg=",
+			"checksumSHA1": "OnMg/E0jAbpbS8yFOIz8KcUHXWY=",
 			"path": "golang.org/x/sys/windows",
-			"revision": "d0faeb539838e250bd0a9db4182d48d4a1915181",
-			"revisionTime": "2018-05-11T14:37:04Z"
+			"revision": "ce36f3865eeb42541ce3f87f32f8462c5687befa",
+			"revisionTime": "2018-07-05T15:01:54Z"
 		}
 	],
-	"rootPath": "github.com/yarencheng/crypto-trade"
+	"rootPath": "github.com/yarencheng/crypto-trade/go"
 }
