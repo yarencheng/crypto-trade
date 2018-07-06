@@ -4,7 +4,6 @@ RUN go get -u github.com/kardianos/govendor
 
 WORKDIR /go/src/github.com/yarencheng/crypto-trade/go
 COPY ./go .
-RUN ls -ltr
 RUN govendor sync -v
 RUN go test -v ./...
 RUN go install ./cmd/simple_trader/...
