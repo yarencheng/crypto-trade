@@ -5,8 +5,11 @@ WORKDIR /go/src/github.com/yarencheng/crypto-trade/
 COPY ./ .
 RUN ls -ltr
 RUN govendor sync -v
+
+RUN pwd
+
 RUN go test ./...
-RUN go install ./cmd/simple_trader/...
+RUN go install ./go/cmd/simple_trader/...
 
 FROM alpine:3.8
 RUN which ls

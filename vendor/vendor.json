@@ -41,38 +41,8 @@
 			"versionExact": "v1.0.5"
 		},
 		{
-			"checksumSHA1": "XHH8+1ESYdBoyKSD4FXwdy1liUk=",
-			"path": "github.com/stretchr/objx",
-			"revision": "b8b73a35e9830ae509858c10dec5866b4d5c8bff",
-			"revisionTime": "2018-07-02T10:34:55Z"
-		},
-		{
-			"checksumSHA1": "nj123dGxKPIF17B6y3VEK2pihRk=",
-			"path": "github.com/stretchr/testify",
-			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
-			"revisionTime": "2018-05-06T18:05:49Z",
-			"version": "v1",
-			"versionExact": "v1.2.2"
-		},
-		{
 			"checksumSHA1": "c6pbpF7eowwO59phRTpF8cQ80Z0=",
 			"path": "github.com/stretchr/testify/assert",
-			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
-			"revisionTime": "2018-05-06T18:05:49Z",
-			"version": "v1",
-			"versionExact": "v1.2.2"
-		},
-		{
-			"checksumSHA1": "fg3TzS9/QK3wZbzei3Z6O8XPLHg=",
-			"path": "github.com/stretchr/testify/http",
-			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
-			"revisionTime": "2018-05-06T18:05:49Z",
-			"version": "v1",
-			"versionExact": "v1.2.2"
-		},
-		{
-			"checksumSHA1": "WmBSFdqpdYRIkp0I408JIZ3LDMY=",
-			"path": "github.com/stretchr/testify/mock",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
 			"revisionTime": "2018-05-06T18:05:49Z",
 			"version": "v1",
@@ -93,14 +63,6 @@
 			"revisionTime": "2017-07-31T09:11:26Z",
 			"version": "v0",
 			"versionExact": "v0.5.2"
-		},
-		{
-			"checksumSHA1": "q9zaM5oBTh+Fo5We5h+qLUfHe+M=",
-			"path": "github.com/yarencheng/gospring",
-			"revision": "7e22a425c1e56e524eb2f149a8ba12366f94d9bd",
-			"revisionTime": "2018-07-06T14:54:38Z",
-			"version": "develop-v2.0",
-			"versionExact": "develop-v2.0"
 		},
 		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
