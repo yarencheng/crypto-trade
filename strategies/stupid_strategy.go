@@ -31,7 +31,6 @@ func (st *StupidStrategy) Start() {
 		for {
 			select {
 			case <-st.stop:
-				log.Infoln("aaaa stop ")
 				return
 			case order := <-st.LiveOrders:
 				log.Infoln("Get order ", order)

@@ -29,7 +29,7 @@ func main() {
 		Properties: []v1.Property{
 			{
 				Name:   "DelayMs",
-				Config: v1.V(int64(1000)),
+				Config: v1.V(int64(10)),
 			},
 			{
 				Name:   "LiveOrders",
