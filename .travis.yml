@@ -1,10 +1,7 @@
 
 
 go:
-  - "1.x"
-  - "1.8"
   - "1.10.x"
-  - master
 
 sudo: required
 
@@ -15,15 +12,19 @@ install:
 
 jobs:
   include:
-    - stage: aa
+    - stage: Pre-build
       script:
-      - echo aa 1
-      - go version
-    - stage: aa
+      - cd go
+      - go get -u github.com/kardianos/govendor
+      - govendor sync -v
+    - stage: Test
       script:
-      - echo aa 2
-      - go version
-    - stage: bb
+      - cd go
+      - go test -v -race -coverprofile=coverage.txt -covermode=atomic
+    - stage: Build
       script:
-      - echo bb 1
-      - go version
+      - cd go
+      - go build -v ./...
+    - stage: Build
+      script:
+      - docker build .
