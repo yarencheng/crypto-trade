@@ -6,7 +6,8 @@ COPY ./ .
 RUN ls -ltr
 RUN govendor sync -v
 
-RUN pwd
+RUN govendor fetch github.com/yarencheng/gospring@develop-v2.0
+RUN govendor sync -v
 
 RUN go test ./...
 RUN go install ./go/cmd/simple_trader/...
