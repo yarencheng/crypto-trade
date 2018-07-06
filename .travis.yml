@@ -22,7 +22,7 @@ jobs:
       install: skip
       script:
       - cd go
-      - go test -v -race -coverprofile=coverage.txt -covermode=atomic
+      - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
     - stage: Build
       install: skip
       script:
