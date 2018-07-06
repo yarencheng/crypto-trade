@@ -11,16 +11,15 @@ import (
 	"github.com/yarencheng/crypto-trade/go/exchange/dummy"
 	"github.com/yarencheng/crypto-trade/go/logger"
 	"github.com/yarencheng/crypto-trade/go/strategies"
+	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
-
-	"github.com/yarencheng/gospring/application_context"
 )
 
 var log = logger.Get("main.go")
 
 func main() {
 
-	ctx := application_context.Default()
+	ctx := applicationcontext.Default()
 
 	err := ctx.AddConfigs(&v1.Bean{
 		ID:        "dummy_exchange",

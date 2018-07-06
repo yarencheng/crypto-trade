@@ -7,12 +7,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yarencheng/crypto-trade/go/data"
-	"github.com/yarencheng/gospring/application_context"
+	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
 )
 
 func TestSss(t *testing.T) {
-	ctx := application_context.Default()
+	ctx := applicationcontext.Default()
 
 	err := ctx.AddConfigs(&v1.Bean{
 		ID:        "dummy_exchange",
