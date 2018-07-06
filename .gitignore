@@ -14,5 +14,5 @@
 .glide/
 
 # govendor
-vendor/*
-!vendor/vendor.json
+go/vendor/*
+!go/vendor/vendor.json
