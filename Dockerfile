@@ -5,7 +5,6 @@ WORKDIR /go/src/github.com/yarencheng/crypto-trade/go
 COPY ./go .
 RUN ls -ltr
 RUN govendor sync -v
-
 RUN go test -v -race ./...
 RUN go install ./cmd/simple_trader/...
 
