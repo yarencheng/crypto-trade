@@ -12,14 +12,11 @@ install:
 
 jobs:
   include:
-    - stage: Pre-build
-      install: skip
-      script:
+    - stage: Test
+      install:
       - go get -u github.com/kardianos/govendor
       - cd go
       - govendor sync -v
-    - stage: Test
-      install: skip
       script:
       - cd go
       - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
