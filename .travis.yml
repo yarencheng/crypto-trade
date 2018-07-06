@@ -1,4 +1,5 @@
 
+
 go:
   - "1.x"
   - "1.8"
@@ -10,11 +11,19 @@ sudo: required
 services:
   - docker
 
+install
+
 jobs:
   include:
     - stage: aa
-      script: echo aa 1
+      script:
+      - echo aa 1
+      - go version
     - stage: aa
-      script: echo aa 2
+      script:
+      - echo aa 2
+      - go version
     - stage: bb
-      script: echo bb
+      script:
+      - echo bb 1
+      - go version
