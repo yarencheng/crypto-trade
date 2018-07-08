@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yarencheng/crypto-trade/go/data"
+	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
 )
@@ -40,7 +40,7 @@ func TestSss(t *testing.T) {
 			},
 		}, */&v1.Channel{
 			ID:   "orders",
-			Type: v1.T(data.Order{}),
+			Type: v1.T(entity.OrderBook{}),
 			Size: 10,
 		}, &v1.Broadcast{
 			ID:       "ordersBroadcast",

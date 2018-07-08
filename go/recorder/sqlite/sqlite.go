@@ -33,7 +33,7 @@ func (s *Sqlite) Start() error {
 	logger.Infof("Open [%v]", s.Path)
 	db, err := gorm.Open("sqlite3", s.Path)
 	if err != nil {
-		err = fmt.Errorf("Failed to connect to []. err: [%v]", s.Path, err)
+		err = fmt.Errorf("Failed to connect to [%v]. err: [%v]", s.Path, err)
 		logger.Warnf("%v", err)
 		return err
 	}

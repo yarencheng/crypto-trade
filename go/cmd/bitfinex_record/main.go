@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/yarencheng/crypto-trade/go/entity"
-	"github.com/yarencheng/crypto-trade/go/entity/recorder/sqlite"
 	"github.com/yarencheng/crypto-trade/go/exchange/bitfinex"
 	"github.com/yarencheng/crypto-trade/go/logger"
+	"github.com/yarencheng/crypto-trade/go/recorder/sqlite"
 	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
 )
@@ -49,7 +49,7 @@ func main() {
 				Config: "orders",
 			}, {
 				Name:   "Path",
-				Config: v1.V("order.sqlite"),
+				Config: v1.V("bitfinex.order.sqlite"),
 			},
 		},
 	}, &v1.Channel{
