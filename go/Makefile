@@ -1,7 +1,6 @@
 ## command
 GO           = go
 GO_VENDOR    = govendor
-MKDIR_P      = mkdir -p
 
 ################################################
 
@@ -31,8 +30,8 @@ install: build
 
 .PHONY: clean
 clean:
-	$(RM) -rf $(BUILD_FOLDER)
 	$(GO) clean -i -r -x -cache -testcache
+	$(RM) -f coverage.txt coverage.html
 
 ## check build env #############################
 
