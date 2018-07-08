@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yarencheng/crypto-trade/go/data"
+	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
@@ -15,7 +15,7 @@ type Dummy struct {
 	stop       chan int
 	wg         sync.WaitGroup
 	DelayMs    int64
-	LiveOrders chan<- data.Order
+	LiveOrders chan<- entity.OrderBook
 }
 
 func New() *Dummy {
@@ -32,9 +32,9 @@ func (dummy *Dummy) Start() {
 	go func() {
 		defer dummy.wg.Done()
 		for {
-			order := data.Order{
-				From: data.BTC,
-				To:   data.ETH,
+			order := entity.OrderBook{
+				From: entity.BTC,
+				To:   entity.ETH,
 			}
 			select {
 			case <-dummy.stop:

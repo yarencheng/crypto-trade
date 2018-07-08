@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/yarencheng/crypto-trade/go/data"
+	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
@@ -13,7 +13,7 @@ var log = logger.Get("stupid_strategy.go")
 type StupidStrategy struct {
 	stop       chan int
 	wg         sync.WaitGroup
-	LiveOrders <-chan data.Order
+	LiveOrders <-chan entity.OrderBook
 }
 
 func New() *StupidStrategy {
