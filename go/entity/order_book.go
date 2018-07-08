@@ -2,10 +2,12 @@ package entity
 
 import (
 	"encoding/json"
+	"time"
 )
 
 type OrderBook struct {
 	Exchange Exchange
+	Time     time.Time
 	From     Currency
 	To       Currency
 	Price    float64

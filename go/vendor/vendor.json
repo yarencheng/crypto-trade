@@ -73,6 +73,28 @@
 			"versionExact": "v1.9.0"
 		},
 		{
+			"checksumSHA1": "IPuI0TCUlOnJGLYWyJDDH6xbtZg=",
+			"path": "github.com/jinzhu/gorm",
+			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
+			"revisionTime": "2018-02-27T23:43:56Z",
+			"version": "v1",
+			"versionExact": "v1.9.1"
+		},
+		{
+			"checksumSHA1": "4VZ1gLZHMumRjV3fclS1aX8S1aQ=",
+			"path": "github.com/jinzhu/gorm/dialects/sqlite",
+			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
+			"revisionTime": "2018-02-27T23:43:56Z",
+			"version": "v1",
+			"versionExact": "v1.9.1"
+		},
+		{
+			"checksumSHA1": "4eelJOSLZoDzLuaJvgilOBVNovU=",
+			"path": "github.com/jinzhu/inflection",
+			"revision": "04140366298a54a039076d798123ffa108fff46c",
+			"revisionTime": "2018-03-08T03:36:59Z"
+		},
+		{
 			"checksumSHA1": "SEnjvwVyfuU2xBaOfXfwPD5MZqk=",
 			"path": "github.com/mattn/go-colorable",
 			"revision": "efa589957cd060542a26d2dd7832fd6a6c6c3ade",
@@ -83,6 +105,12 @@
 			"path": "github.com/mattn/go-isatty",
 			"revision": "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c",
 			"revisionTime": "2017-11-07T05:05:31Z"
+		},
+		{
+			"checksumSHA1": "yzN9Xevf9xfTZ6pTtLBM/KPYlAU=",
+			"path": "github.com/mattn/go-sqlite3",
+			"revision": "3aefd9f0a162514f66d0e4ceda3edc44e66b502e",
+			"revisionTime": "2018-06-30T19:54:21Z"
 		},
 		{
 			"checksumSHA1": "CIK3BBNX3nuUQCmNqTQydNfMNKI=",

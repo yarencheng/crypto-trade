@@ -120,6 +120,7 @@ func (b *Bitfinex) listenOrderBook(client *websocket.Client) {
 			case bitfinex.Bid:
 				b.OrderBooks <- entity.OrderBook{
 					Exchange: entity.Bitfinex,
+					Time:     time.Now(),
 					From:     entity.BTC,
 					To:       entity.ETH,
 					Price:    update.Price,
@@ -128,6 +129,7 @@ func (b *Bitfinex) listenOrderBook(client *websocket.Client) {
 			case bitfinex.Ask:
 				b.OrderBooks <- entity.OrderBook{
 					Exchange: entity.Bitfinex,
+					Time:     time.Now(),
 					From:     entity.ETH,
 					To:       entity.BTC,
 					Price:    1 / update.Price,
@@ -181,42 +183,4 @@ func convertToSymbol(pair sets.Set) (string, bool) {
 	} else {
 		return "", false
 	}
-}
-
-func aaa() {
-
-	c := websocket.New()
-
-	err := c.Connect()
-	if err != nil {
-		logger.Fatal("Error connecting to web socket : ", err)
-	}
-
-	// subscribe to BTCUSD book
-	ctx, cxl1 := context.WithTimeout(context.Background(), time.Second*5)
-	defer cxl1()
-	_, err = c.SubscribeBook(ctx, bitfinex.TradingPrefix+bitfinex.BTCUSD, bitfinex.Precision0, bitfinex.FrequencyRealtime, 25)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	// subscribe to BTCUSD trades
-	ctx, cxl2 := context.WithTimeout(context.Background(), time.Second*5)
-	defer cxl2()
-	_, err = c.SubscribeTrades(ctx, bitfinex.TradingPrefix+bitfinex.BTCUSD)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	for obj := range c.Listen() {
-		switch obj.(type) {
-		case error:
-			logger.Infof("channel closed: %s", obj)
-			break
-		default:
-		}
-		logger.Infof("MSG RECV: %#v", obj)
-		logger.Infof("MSG RECV: %v", reflect.TypeOf(obj))
-	}
-
 }

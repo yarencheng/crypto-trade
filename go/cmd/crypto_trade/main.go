@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/yarencheng/crypto-trade/go/entity"
+	"github.com/yarencheng/crypto-trade/go/entity/recorder/sqlite"
 	"github.com/yarencheng/crypto-trade/go/exchange/bitfinex"
 	"github.com/yarencheng/crypto-trade/go/logger"
-	"github.com/yarencheng/crypto-trade/go/strategies"
 	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
 )
@@ -40,13 +40,16 @@ func main() {
 			},
 		},
 	}, &v1.Bean{
-		ID:        "stupid_strategy_1",
-		Type:      v1.T(strategies.StupidStrategy{}),
-		FactoryFn: strategies.New,
+		ID:        "sqlite_recorder",
+		Type:      v1.T(sqlite.Sqlite{}),
+		FactoryFn: sqlite.New,
 		Properties: []v1.Property{
 			{
-				Name:   "LiveOrders",
+				Name:   "OrderBooks",
 				Config: "orders",
+			}, {
+				Name:   "Path",
+				Config: v1.V("order.sqlite"),
 			},
 		},
 	}, &v1.Channel{
@@ -59,9 +62,9 @@ func main() {
 		logger.Fatalf("Add configs to ctx failed. err: [%v]", err)
 	}
 
-	_, err = ctx.GetByID("stupid_strategy_1")
+	_, err = ctx.GetByID("sqlite_recorder")
 	if err != nil {
-		logger.Fatalf("Failed to get stupid_strategy_1. err: [%v]", err)
+		logger.Fatalf("Failed to get sqlite_recorder. err: [%v]", err)
 	}
 
 	_, err = ctx.GetByID("bitfinex")
