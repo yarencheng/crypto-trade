@@ -18,3 +18,5 @@ go/coverage.html
 # govendor
 go/vendor/*
 !go/vendor/vendor.json
+
+**/debug

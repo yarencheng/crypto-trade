@@ -35,7 +35,7 @@ func main() {
 	c.WriteMessage(websocket.TextMessage, []byte(`
 	{
 		"command": "subscribe",
-		"channel": "1010"
+		"channel": "148"
 	  }
 	`))
 
