@@ -47,19 +47,16 @@ docker.antlr4.build:
 
 ## antlr4 ############
 
-.PHONY: antlr4
-antlr4: docker.antlr4.build
-	docker run -it --rm \
-		-w `pwd` \
-		--volume `pwd`:`pwd` \
-		--user `id -u`:`id -g` \
-		yarencheng/crypto-trade/antlr4:latest \
-			-Dlanguage=Go \
-			-Xexact-output-dir \
+ANTLR4 = docker run -it --rm --workdir `pwd` --volume `pwd`:`pwd` --user `id -u`:`id -g` yarencheng/crypto-trade/antlr4:latest \
+         -Dlanguage=Go -Xexact-output-dir -long-messages
+
 			-o go/exchange/poloniex/parser/ \
-			-long-messages \
 			-package parser \
 			antlr4/JSON.g4
+
+.PHONY: antlr4
+antlr4: docker.antlr4.build
+	$(ANTLR4) -package parser -o go/exchange/poloniex/parser/ antlr4/exchange/poloniex/JSON.g4
 
 ## check build env #############################
 
