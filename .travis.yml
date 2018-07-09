@@ -9,7 +9,7 @@ services:
   - docker
 
 install:
-  - go get -u github.com/kardianos/govendor
+  - echo do_nothing
 
 script:
   - make

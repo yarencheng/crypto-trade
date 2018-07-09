@@ -55,9 +55,10 @@ antlr4: docker.antlr4.build
 		--user `id -u`:`id -g` \
 		yarencheng/crypto-trade/antlr4:latest \
 			-Dlanguage=Go \
+			-Xexact-output-dir \
 			-o go/exchange/poloniex/parser/ \
 			-long-messages \
-			-package antlr4 \
+			-package parser \
 			antlr4/JSON.g4
 
 ## check build env #############################
