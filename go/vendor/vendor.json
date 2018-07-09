@@ -73,6 +73,14 @@
 			"versionExact": "v1.9.0"
 		},
 		{
+			"checksumSHA1": "hEnH6sgR83Qfx7UNnphNNlelmj0=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "ea4d1f681babbce9545c9c5f3d5194a789c89f5b",
+			"revisionTime": "2017-06-20T19:01:03Z",
+			"version": "v1",
+			"versionExact": "v1.2.0"
+		},
+		{
 			"checksumSHA1": "IPuI0TCUlOnJGLYWyJDDH6xbtZg=",
 			"path": "github.com/jinzhu/gorm",
 			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
