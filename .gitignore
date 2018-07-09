@@ -20,3 +20,4 @@ go/vendor/*
 !go/vendor/vendor.json
 
 go/**/debug
+go/exchange/poloniex/parser
