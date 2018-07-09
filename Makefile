@@ -31,6 +31,7 @@ install: build
 .PHONY: clean
 clean:
 	$(MAKE) clean -C go
+	$(RM) -rf go/exchange/poloniex/parser
 	$(DOCKER) rmi yarencheng/crypto-trade/bitfinex_record:latest || true
 	$(DOCKER) rmi yarencheng/crypto-trade/antlr4:latest || true
 
