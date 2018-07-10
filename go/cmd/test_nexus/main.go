@@ -42,7 +42,11 @@ func main() {
 	go func() {
 		defer close(done)
 		for {
-			_, message, err := c.ReadMessage()
+			// _, message, err := c.ReadMessage()
+
+			message := make([]interface{}, 0)
+			err := c.ReadJSON(&message)
+
 			if err != nil {
 				log.Println("read:", err)
 				return

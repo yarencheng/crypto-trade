@@ -33,7 +33,12 @@ func (b *Bitfinex) Start() error {
 	logger.Info("Starting")
 	defer logger.Info("Started")
 
-	b.startListenOrderBook()
+	err := b.startListenOrderBook()
+	if err != nil {
+		err = fmt.Errorf("Listen order book failed. err: [%v]", err)
+		logger.Warnf("%v", err)
+		return err
+	}
 
 	return nil
 }
