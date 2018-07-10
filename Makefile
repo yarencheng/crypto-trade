@@ -17,7 +17,7 @@ pre-build: check antlr4
 	$(MAKE) pre-build -C go
 
 .PHONY: build
-build: pre-build docker.bitfinex_record.build
+build: pre-build docker.bitfinex_record.build docker.poloniex_record.build
 	$(MAKE) build -C go
 
 .PHONY: test
@@ -40,6 +40,10 @@ clean:
 .PHONY: docker.bitfinex_record.build
 docker.bitfinex_record.build:
 	docker build -t yarencheng/crypto-trade/bitfinex_record:latest --file docker/bitfinex_record/Dockerfile .
+
+.PHONY: docker.poloniex_record.build
+docker.poloniex_record.build:
+	docker build -t yarencheng/crypto-trade/poloniex_record:latest --file docker/poloniex_record/Dockerfile .
 
 .PHONY: docker.antlr4.build
 docker.antlr4.build:
