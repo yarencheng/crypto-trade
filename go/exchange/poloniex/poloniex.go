@@ -219,9 +219,40 @@ func (p *Poloniex) processAggregatedBookPayload(from, to entity.Currency, payloa
 
 	switch op {
 	case "o":
-		logger.Errorf("aaa %#v", payload)
+		isAsk := payload[1].(float64) == 0
+
+		price, err := strconv.ParseFloat(payload[2].(string), 64)
+		if err != nil {
+			return fmt.Errorf("[%v] is not a float64, err: [%v]", payload[2], err)
+		}
+
+		volume, err := strconv.ParseFloat(payload[3].(string), 64)
+		if err != nil {
+			return fmt.Errorf("[%v] is not a float64, err: [%v]", payload[3], err)
+		}
+
+		if isAsk {
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     entity.ETH,
+				To:       entity.BTC,
+				Price:    1 / price,
+				Volume:   price * volume,
+			}
+		} else {
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     entity.BTC,
+				To:       entity.ETH,
+				Price:    price,
+				Volume:   volume,
+			}
+		}
+
 	case "t":
-		logger.Errorf("aaa %#v", payload)
+		logger.Warnf("TODO: %#v", payload)
 	case "i":
 		m, ok := payload[1].(map[string]interface{})
 		if !ok {
