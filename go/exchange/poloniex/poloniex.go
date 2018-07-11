@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"reflect"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/emirpasic/gods/sets"
 	"github.com/emirpasic/gods/sets/hashset"
@@ -111,7 +114,11 @@ func (p *Poloniex) startAggregatedBook() error {
 				logger.Warnf("%v", err)
 				return
 			}
-			logger.Infof("recv: %s", message)
+			if err := p.processChannelResponce(message); err != nil {
+				err = fmt.Errorf("Process message failed. err: [%v]", err)
+				logger.Warnf("%v", err)
+				return
+			}
 		}
 	}()
 
@@ -119,7 +126,13 @@ func (p *Poloniex) startAggregatedBook() error {
 	go func() {
 		defer p.stopWg.Done()
 		defer c.Close()
+
 		<-p.stop
+
+		err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		if err != nil {
+			logger.Warnf("Close web socket client failed. err: [%v]", err)
+		}
 	}()
 
 	return nil
@@ -132,4 +145,143 @@ func pairToChannelID(pair sets.Set) (string, bool) {
 	} else {
 		return "", false
 	}
+}
+
+func (p *Poloniex) processChannelResponce(r []interface{}) error {
+
+	logger.Debugf("channel responce: [%#v]", r)
+
+	var channelID int
+	var sequenceNumber int
+	var err error
+
+	switch r[0].(type) {
+	case string:
+		channelID, err = strconv.Atoi(r[0].(string))
+		if err != nil {
+			return fmt.Errorf("Parse string to int failed. err: [%v]", err)
+		}
+	case float64:
+		channelID = int(r[0].(float64))
+	default:
+		return fmt.Errorf("The 1st element should be a float64 or string but a [%v]", reflect.TypeOf(r[0]))
+	}
+
+	switch r[1].(type) {
+	case float64:
+		sequenceNumber = int(r[1].(float64))
+	default:
+		return fmt.Errorf("The 2nd element should be a float64 but a [%v]", reflect.TypeOf(r[1]))
+	}
+
+	logger.Debugf("channelID = [%v], sequenceNumber = [%v]", channelID, sequenceNumber)
+
+	for index := 2; index < len(r); index++ {
+
+		payload1, ok := r[index].([]interface{})
+		if !ok {
+			return fmt.Errorf("The [%v] element should be a []interface{} but a [%v]", index, reflect.TypeOf(r[index]))
+		}
+
+		payload2, ok := payload1[0].([]interface{})
+		if !ok {
+			return fmt.Errorf("The [%v] element should be a []interface{} but a [%v]", index, reflect.TypeOf(payload1[0]))
+		}
+
+		switch channelID {
+		case 148:
+			if err := p.processAggregatedBookPayload(entity.BTC, entity.ETH, payload2); err != nil {
+				return fmt.Errorf("Process payload failed. err: [%v]", err)
+			}
+		default:
+			return fmt.Errorf("Unsupported channel [%v]", channelID)
+		}
+	}
+
+	return nil
+}
+
+func (p *Poloniex) processAggregatedBookPayload(from, to entity.Currency, payload []interface{}) error {
+
+	logger.Debugf("from: [%v]", from)
+	logger.Debugf("to: [%v]", to)
+	logger.Debugf("payload: [%v]", payload)
+
+	op, ok := payload[0].(string)
+	if !ok {
+		return fmt.Errorf("The 1st element is not a string but a [%v]", reflect.TypeOf(payload[0]))
+	}
+
+	switch op {
+	case "o":
+	case "t":
+	case "i":
+		m, ok := payload[1].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("The 2nd element is not a map[string]interface{} but a [%v]", reflect.TypeOf(payload[1]))
+		}
+
+		orderBook, ok := m["orderBook"].([]interface{})
+		if !ok {
+			return fmt.Errorf("The \"orderBook\" element is not a []interface{} but a [%v]", reflect.TypeOf(m["orderBook"]))
+		}
+
+		asks, ok := orderBook[0].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("The 1st element of \"orderBook\" is not a map[string]interface{} but a [%v]", reflect.TypeOf(orderBook[0]))
+		}
+
+		bids, ok := orderBook[1].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("The 2nd element of \"orderBook\" is not a map[string]interface{} but a [%v]", reflect.TypeOf(orderBook[1]))
+		}
+
+		for price, volume := range asks {
+
+			pf, err := strconv.ParseFloat(price, 64)
+			if err != nil {
+				return fmt.Errorf("[%v] is not a float64, err: [%v]", price, err)
+			}
+
+			vf, err := strconv.ParseFloat(volume.(string), 64)
+			if err != nil {
+				return fmt.Errorf("[%v] is not a float64, err: [%v]", vf, err)
+			}
+
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     entity.ETH,
+				To:       entity.BTC,
+				Price:    1 / pf,
+				Volume:   pf * vf,
+			}
+		}
+
+		for price, volume := range bids {
+			pf, err := strconv.ParseFloat(price, 64)
+			if err != nil {
+				return fmt.Errorf("[%v] is not a float64, err: [%v]", price, err)
+			}
+
+			vf, err := strconv.ParseFloat(volume.(string), 64)
+			if err != nil {
+				return fmt.Errorf("[%v] is not a float64, err: [%v]", vf, err)
+			}
+
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     entity.BTC,
+				To:       entity.ETH,
+				Price:    pf,
+				Volume:   vf,
+			}
+		}
+
+	default:
+		return fmt.Errorf("unsupported op [%v]", op)
+	}
+
+	return nil
 }
