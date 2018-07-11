@@ -167,6 +167,11 @@ func (p *Poloniex) processChannelResponce(r []interface{}) error {
 		return fmt.Errorf("The 1st element should be a float64 or string but a [%v]", reflect.TypeOf(r[0]))
 	}
 
+	if channelID == 1010 {
+		//heart beat
+		return nil
+	}
+
 	switch r[1].(type) {
 	case float64:
 		sequenceNumber = int(r[1].(float64))
@@ -214,7 +219,9 @@ func (p *Poloniex) processAggregatedBookPayload(from, to entity.Currency, payloa
 
 	switch op {
 	case "o":
+		logger.Errorf("aaa %#v", payload)
 	case "t":
+		logger.Errorf("aaa %#v", payload)
 	case "i":
 		m, ok := payload[1].(map[string]interface{})
 		if !ok {

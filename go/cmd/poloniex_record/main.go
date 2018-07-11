@@ -55,7 +55,7 @@ func main() {
 	}, &v1.Channel{
 		ID:   "orders",
 		Type: v1.T(entity.OrderBook{}),
-		Size: 10,
+		Size: 1000,
 	})
 
 	if err != nil {

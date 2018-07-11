@@ -82,16 +82,36 @@ func (s *Sqlite) Stop(ctx context.Context) error {
 }
 
 func (s *Sqlite) recordOrder() {
+
+	tx := s.db.Begin()
+	count := 0
+	max := 1000
+
 	for {
 		select {
 		case <-s.stop:
+			if err := tx.Commit().Error; err != nil {
+				logger.Errorf("Commit failed, err: [%v]", err)
+				return
+			}
 			return
 		case order := <-s.OrderBooks:
 			logger.Debugf("Get order [%#v]", order)
-			s.db.Create(&order)
-			if s.db.Error != nil {
-				logger.Warnf("Failed to insert order [%#v]. err: [%v]", order, s.db.Error)
+
+			if err := tx.Create(&order).Error; err != nil {
+				logger.Errorf("Create [%#v] failed, err: [%v]", order, err)
+				tx.Rollback()
 				return
+			}
+			count++
+
+			if count == max {
+				count = 0
+				if err := tx.Commit().Error; err != nil {
+					logger.Errorf("Commit failed, err: [%v]", err)
+					return
+				}
+				tx = s.db.Begin()
 			}
 		}
 	}

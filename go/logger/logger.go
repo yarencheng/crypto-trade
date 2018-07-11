@@ -16,7 +16,7 @@ func init() {
 	logrus.SetFormatter(customFormatter)
 
 	logrus.SetOutput(os.Stdout)
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 }
 
 func Get(filename string) *logrus.Entry {
