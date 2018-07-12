@@ -3,6 +3,7 @@ package poloniex
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yarencheng/crypto-trade/go/entity"
@@ -26,4 +27,6 @@ func TestSss(t *testing.T) {
 
 	// assert
 	assert.NoError(t, err)
+
+	time.Sleep(10 * time.Second)
 }

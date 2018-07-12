@@ -2,9 +2,9 @@ package poloniex
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -12,20 +12,24 @@ import (
 	"github.com/emirpasic/gods/sets"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/gorilla/websocket"
+	"github.com/tidwall/gjson"
 	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
 type Poloniex struct {
-	Currencies []entity.Currency
-	OrderBooks chan<- entity.OrderBook
-	stop       chan int
-	stopWg     sync.WaitGroup
+	Currencies  []entity.Currency
+	OrderBooks  chan<- entity.OrderBook
+	stop        chan int
+	stopWg      sync.WaitGroup
+	wsSeqenceID map[int64]int64 // key: channel_id, value sequence
+	subChannels []string
 }
 
 func New() *Poloniex {
 	b := &Poloniex{
-		stop: make(chan int, 1),
+		stop:        make(chan int, 1),
+		subChannels: make([]string, 0),
 	}
 	return b
 }
@@ -34,12 +38,46 @@ func (p *Poloniex) Start() error {
 	logger.Info("Starting")
 	defer logger.Info("Started")
 
-	err := p.startAggregatedBook()
-	if err != nil {
-		err = fmt.Errorf("Listen order book failed. err: [%v]", err)
-		logger.Warnf("%v", err)
-		return err
+	ids := hashset.New()
+	for _, c1 := range p.Currencies {
+		for _, c2 := range p.Currencies {
+			pair := hashset.New()
+			pair.Add(c1, c2)
+			id, ok := pairToChannelID(pair)
+			if !ok {
+				continue
+			}
+			ids.Add(id)
+		}
 	}
+
+	for _, id := range ids.Values() {
+		p.subChannels = append(p.subChannels, id.(string))
+	}
+
+	p.stopWg.Add(1)
+	go func() {
+		defer p.stopWg.Done()
+
+		for {
+			logger.Infof("Listening to web socket")
+
+			err := p.listenWebSocket()
+
+			if err != nil {
+				logger.Warnf("Got an error; not restart web socket. err: [%v]", err)
+				return
+			}
+
+			select {
+			case <-p.stop:
+				return
+			default:
+				logger.Infof("Restart web socket")
+			}
+		}
+
+	}()
 
 	return nil
 }
@@ -64,76 +102,242 @@ func (p *Poloniex) Stop(ctx context.Context) error {
 	}
 }
 
-func (p *Poloniex) startAggregatedBook() error {
+func (p *Poloniex) listenWebSocket() error {
 
-	u := url.URL{
+	url := url.URL{
 		Scheme: "wss",
 		Host:   "api2.poloniex.com",
 	}
 
-	logger.Infof("connecting to %s", u.String())
+	logger.Infof("Connecting to [%v]", url.String())
 
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	client, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
 	if err != nil {
-		err = fmt.Errorf("Dial to [%v] failed. err: [%v]", u, err)
+		err = fmt.Errorf("Dial to [%v] failed. err: [%v]", url, err)
 		logger.Warnf("%v", err)
 		return err
 	}
 
-	for _, c1 := range p.Currencies {
-		for _, c2 := range p.Currencies {
+	logger.Infof("Connected to [%v]", url.String())
 
-			pair := hashset.New()
-			pair.Add(c1, c2)
+	p.wsSeqenceID = make(map[int64]int64)
 
-			id, ok := pairToChannelID(pair)
-			if !ok {
-				continue
-			}
+	logger.Infof("Subscribe heart beat")
 
-			logger.Infof("subscribe channel [%v]", id)
-			json := "{\"command\":\"subscribe\",\"channel\": \"" + id + "\"}"
-			err := c.WriteMessage(websocket.TextMessage, []byte(json))
-			if err != nil {
-				err = fmt.Errorf("Send message [%v] failed. err: [%v]", json, err)
-				logger.Warnf("%v", err)
-				return err
-			}
+	for _, id := range p.subChannels {
+		logger.Infof("Subscribe channel [%v]", id)
+		j := "{\"command\":\"subscribe\",\"channel\": \"" + id + "\"}"
+		err = client.WriteMessage(websocket.TextMessage, []byte(j))
+		if err != nil {
+			err = fmt.Errorf("Subscribe channel [%v] failed. err: [%v]", id, err)
+			logger.Warnf("%v", err)
+			return err
 		}
 	}
 
-	p.stopWg.Add(1)
-	go func() {
-		defer p.stopWg.Done()
-		for {
-			message := make([]interface{}, 0)
-			err := c.ReadJSON(&message)
+	stopLoop := make(chan int, 1)
 
-			if err != nil {
-				err = fmt.Errorf("Read message failed. err: [%v]", err)
-				logger.Warnf("%v", err)
-				return
-			}
-			if err := p.processChannelResponce(message); err != nil {
-				err = fmt.Errorf("Process message failed. err: [%v]", err)
-				logger.Warnf("%v", err)
-				return
-			}
+	go func() {
+		defer client.Close()
+		select {
+		case <-p.stop:
+		case <-stopLoop:
 		}
-	}()
 
-	p.stopWg.Add(1)
-	go func() {
-		defer p.stopWg.Done()
-		defer c.Close()
-
-		<-p.stop
-
-		err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 		if err != nil {
 			logger.Warnf("Close web socket client failed. err: [%v]", err)
 		}
+
+		p.wsSeqenceID = nil
 	}()
+
+	for {
+		message := make([]interface{}, 0)
+		err = client.ReadJSON(&message)
+
+		if err != nil {
+			err = fmt.Errorf("Read message failed. err: [%v]", err)
+			logger.Warnf("%v", err)
+			close(stopLoop)
+			return err
+		}
+
+		j, err := json.Marshal(message)
+		if err != nil {
+			return fmt.Errorf("Failed to marshal json [%v]. err: [%v]", j, err)
+		}
+
+		gj := gjson.ParseBytes(j)
+
+		logger.Debugf("message [%v]", gj)
+
+		if err := p.handleWebsockerResponse(&gj); err != nil {
+			return fmt.Errorf("Process message [%v] failed. err: [%v]", message, err)
+		}
+	}
+
+	return nil
+}
+
+func (p *Poloniex) handleWebsockerResponse(gj *gjson.Result) error {
+
+	if !gj.IsArray() {
+		return fmt.Errorf("Not a json array")
+	}
+
+	ar := gj.Array()
+
+	var ch int64
+	if len(ar) <= 0 {
+		return fmt.Errorf("1st element 'channel_id' is missing")
+	} else {
+		ch = ar[0].Int()
+	}
+
+	if ch == 1010 {
+		logger.Debugf("Receive heart beat")
+		return nil
+	}
+
+	var sequence int64
+	if len(ar) <= 1 {
+		return fmt.Errorf("2nd element 'sequence_number' is missing")
+	} else {
+		sequence = ar[1].Int()
+	}
+
+	if old, ok := p.wsSeqenceID[ch]; ok {
+		if old >= sequence {
+			return fmt.Errorf("Channel [%v] receive new sequence [%v] is small then last one [%v]", ch, sequence, old)
+		}
+	}
+
+	p.wsSeqenceID[ch] = sequence
+
+	if !ar[2].IsArray() {
+		return fmt.Errorf("Not array")
+	}
+
+	ar = ar[2].Array()
+
+	var err error
+	for i := 0; i < len(ar); i++ {
+		switch ch {
+		case 148: // BTC_ETH
+			err = p.handlePriceAggregatedBook(entity.BTC, entity.ETH, &ar[i])
+		default:
+			return fmt.Errorf("Unknown channel ID [%v]", ch)
+		}
+	}
+
+	return err
+}
+
+func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.Result) error {
+
+	if !gj.IsArray() {
+		return fmt.Errorf("Not a json array")
+	}
+
+	ar := gj.Array()
+
+	if len(ar) <= 0 {
+		return fmt.Errorf("op code is missing")
+	}
+
+	op := ar[0].String()
+
+	switch op {
+	case "i":
+		if len(ar) != 2 {
+			return fmt.Errorf("need 2 element")
+		}
+
+		asks := ar[1].Get("orderBook.0")
+		bids := ar[1].Get("orderBook.1")
+
+		if (!asks.Exists()) || (!asks.IsObject()) {
+			return fmt.Errorf("asks is missing")
+		}
+
+		if (!bids.Exists()) || (!bids.IsObject()) {
+			return fmt.Errorf("bids is missing")
+		}
+
+		for ps, vs := range asks.Map() {
+
+			price, err := strconv.ParseFloat(ps, 64)
+			if err != nil {
+				return fmt.Errorf("[%v]is not float", ps)
+			}
+
+			volume := vs.Float()
+
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     c2,
+				To:       c1,
+				Price:    1 / price,
+				Volume:   price * volume,
+			}
+		}
+
+		for ps, vs := range bids.Map() {
+
+			price, err := strconv.ParseFloat(ps, 64)
+			if err != nil {
+				return fmt.Errorf("[%v]is not float", ps)
+			}
+
+			volume := vs.Float()
+
+			p.OrderBooks <- entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     c1,
+				To:       c2,
+				Price:    price,
+				Volume:   volume,
+			}
+		}
+
+	case "o":
+
+		if len(ar) != 4 {
+			return fmt.Errorf("need 4 element")
+		}
+
+		isAsk := ar[1].Int() == 0
+		price := ar[2].Float()
+		volume := ar[3].Float()
+
+		var order *entity.OrderBook
+		if isAsk {
+			order = &entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     c2,
+				To:       c1,
+				Price:    1 / price,
+				Volume:   price * volume,
+			}
+		} else {
+			order = &entity.OrderBook{
+				Exchange: entity.Poloniex,
+				Time:     time.Now(),
+				From:     c1,
+				To:       c2,
+				Price:    price,
+				Volume:   volume,
+			}
+		}
+
+		logger.Debugf("Receive order [%v]", order)
+
+		p.OrderBooks <- *order
+	}
 
 	return nil
 }
@@ -145,181 +349,4 @@ func pairToChannelID(pair sets.Set) (string, bool) {
 	} else {
 		return "", false
 	}
-}
-
-func (p *Poloniex) processChannelResponce(r []interface{}) error {
-
-	logger.Debugf("channel responce: [%#v]", r)
-
-	var channelID int
-	var sequenceNumber int
-	var err error
-
-	switch r[0].(type) {
-	case string:
-		channelID, err = strconv.Atoi(r[0].(string))
-		if err != nil {
-			return fmt.Errorf("Parse string to int failed. err: [%v]", err)
-		}
-	case float64:
-		channelID = int(r[0].(float64))
-	default:
-		return fmt.Errorf("The 1st element should be a float64 or string but a [%v]", reflect.TypeOf(r[0]))
-	}
-
-	if channelID == 1010 {
-		//heart beat
-		return nil
-	}
-
-	switch r[1].(type) {
-	case float64:
-		sequenceNumber = int(r[1].(float64))
-	default:
-		return fmt.Errorf("The 2nd element should be a float64 but a [%v]", reflect.TypeOf(r[1]))
-	}
-
-	logger.Debugf("channelID = [%v], sequenceNumber = [%v]", channelID, sequenceNumber)
-
-	for index := 2; index < len(r); index++ {
-
-		payload1, ok := r[index].([]interface{})
-		if !ok {
-			return fmt.Errorf("The [%v] element should be a []interface{} but a [%v]", index, reflect.TypeOf(r[index]))
-		}
-
-		payload2, ok := payload1[0].([]interface{})
-		if !ok {
-			return fmt.Errorf("The [%v] element should be a []interface{} but a [%v]", index, reflect.TypeOf(payload1[0]))
-		}
-
-		switch channelID {
-		case 148:
-			if err := p.processAggregatedBookPayload(entity.BTC, entity.ETH, payload2); err != nil {
-				return fmt.Errorf("Process payload failed. err: [%v]", err)
-			}
-		default:
-			return fmt.Errorf("Unsupported channel [%v]", channelID)
-		}
-	}
-
-	return nil
-}
-
-func (p *Poloniex) processAggregatedBookPayload(from, to entity.Currency, payload []interface{}) error {
-
-	logger.Debugf("from: [%v]", from)
-	logger.Debugf("to: [%v]", to)
-	logger.Debugf("payload: [%v]", payload)
-
-	op, ok := payload[0].(string)
-	if !ok {
-		return fmt.Errorf("The 1st element is not a string but a [%v]", reflect.TypeOf(payload[0]))
-	}
-
-	switch op {
-	case "o":
-		isAsk := payload[1].(float64) == 0
-
-		price, err := strconv.ParseFloat(payload[2].(string), 64)
-		if err != nil {
-			return fmt.Errorf("[%v] is not a float64, err: [%v]", payload[2], err)
-		}
-
-		volume, err := strconv.ParseFloat(payload[3].(string), 64)
-		if err != nil {
-			return fmt.Errorf("[%v] is not a float64, err: [%v]", payload[3], err)
-		}
-
-		if isAsk {
-			p.OrderBooks <- entity.OrderBook{
-				Exchange: entity.Poloniex,
-				Time:     time.Now(),
-				From:     entity.ETH,
-				To:       entity.BTC,
-				Price:    1 / price,
-				Volume:   price * volume,
-			}
-		} else {
-			p.OrderBooks <- entity.OrderBook{
-				Exchange: entity.Poloniex,
-				Time:     time.Now(),
-				From:     entity.BTC,
-				To:       entity.ETH,
-				Price:    price,
-				Volume:   volume,
-			}
-		}
-
-	case "t":
-		logger.Warnf("TODO: %#v", payload)
-	case "i":
-		m, ok := payload[1].(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("The 2nd element is not a map[string]interface{} but a [%v]", reflect.TypeOf(payload[1]))
-		}
-
-		orderBook, ok := m["orderBook"].([]interface{})
-		if !ok {
-			return fmt.Errorf("The \"orderBook\" element is not a []interface{} but a [%v]", reflect.TypeOf(m["orderBook"]))
-		}
-
-		asks, ok := orderBook[0].(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("The 1st element of \"orderBook\" is not a map[string]interface{} but a [%v]", reflect.TypeOf(orderBook[0]))
-		}
-
-		bids, ok := orderBook[1].(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("The 2nd element of \"orderBook\" is not a map[string]interface{} but a [%v]", reflect.TypeOf(orderBook[1]))
-		}
-
-		for price, volume := range asks {
-
-			pf, err := strconv.ParseFloat(price, 64)
-			if err != nil {
-				return fmt.Errorf("[%v] is not a float64, err: [%v]", price, err)
-			}
-
-			vf, err := strconv.ParseFloat(volume.(string), 64)
-			if err != nil {
-				return fmt.Errorf("[%v] is not a float64, err: [%v]", vf, err)
-			}
-
-			p.OrderBooks <- entity.OrderBook{
-				Exchange: entity.Poloniex,
-				Time:     time.Now(),
-				From:     entity.ETH,
-				To:       entity.BTC,
-				Price:    1 / pf,
-				Volume:   pf * vf,
-			}
-		}
-
-		for price, volume := range bids {
-			pf, err := strconv.ParseFloat(price, 64)
-			if err != nil {
-				return fmt.Errorf("[%v] is not a float64, err: [%v]", price, err)
-			}
-
-			vf, err := strconv.ParseFloat(volume.(string), 64)
-			if err != nil {
-				return fmt.Errorf("[%v] is not a float64, err: [%v]", vf, err)
-			}
-
-			p.OrderBooks <- entity.OrderBook{
-				Exchange: entity.Poloniex,
-				Time:     time.Now(),
-				From:     entity.BTC,
-				To:       entity.ETH,
-				Price:    pf,
-				Volume:   vf,
-			}
-		}
-
-	default:
-		return fmt.Errorf("unsupported op [%v]", op)
-	}
-
-	return nil
 }
