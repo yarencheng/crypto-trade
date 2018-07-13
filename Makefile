@@ -17,7 +17,7 @@ pre-build: check antlr4
 	$(MAKE) pre-build -C go
 
 .PHONY: build
-build: pre-build docker.bitfinex_record.build docker.poloniex_record.build
+build: pre-build docker.bitfinex_recorder.build docker.poloniex_recorder.build
 	$(MAKE) build -C go
 
 .PHONY: test
@@ -31,19 +31,19 @@ install: build
 .PHONY: clean
 clean:
 	$(MAKE) clean -C go
-	$(RM) -rf go/exchange/poloniex/parser
-	$(DOCKER) rmi yarencheng/crypto-trade/bitfinex_record:latest || true
-	$(DOCKER) rmi yarencheng/crypto-trade/antlr4:latest || true
+	$(DOCKER) rmi yarencheng/crypto-trade/bitfinex_recorder:latest || true
+	$(DOCKER) rmi yarencheng/crypto-trade/poloniex_recorder:latest || true
+	# $(DOCKER) rmi yarencheng/crypto-trade/antlr4:latest || true
 
 ## docker ############
 
-.PHONY: docker.bitfinex_record.build
-docker.bitfinex_record.build:
-	docker build -t yarencheng/crypto-trade/bitfinex_record:latest --file docker/bitfinex_record/Dockerfile .
+.PHONY: docker.bitfinex_recorder.build
+docker.bitfinex_recorder.build:
+	docker build -t yarencheng/crypto-trade/bitfinex_recorder:latest --file docker/bitfinex_recorder/Dockerfile .
 
-.PHONY: docker.poloniex_record.build
-docker.poloniex_record.build:
-	docker build -t yarencheng/crypto-trade/poloniex_record:latest --file docker/poloniex_record/Dockerfile .
+.PHONY: docker.poloniex_recorder.build
+docker.poloniex_recorder.build:
+	docker build -t yarencheng/crypto-trade/poloniex_recorder:latest --file docker/poloniex_recorder/Dockerfile .
 
 .PHONY: docker.antlr4.build
 docker.antlr4.build:

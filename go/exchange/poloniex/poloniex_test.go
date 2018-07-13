@@ -13,7 +13,7 @@ func TestSss(t *testing.T) {
 	// arrange
 	p := New()
 	p.Currencies = []entity.Currency{entity.BTC, entity.ETH}
-	orderBooks := make(chan entity.OrderBook)
+	orderBooks := make(chan entity.OrderBookEvent)
 	go func() {
 		for {
 			<-orderBooks

@@ -8,6 +8,6 @@ RUN make install
 
 FROM alpine:3.8
 RUN apk add --no-cache ca-certificates
-COPY --from=GO /go/bin/poloniex_record /bin/.
+COPY --from=GO /go/bin/bitfinex_recorder /bin/.
 
-ENTRYPOINT [ "poloniex_record" ]
+ENTRYPOINT [ "bitfinex_recorder" ]
