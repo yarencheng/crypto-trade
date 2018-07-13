@@ -338,6 +338,7 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 			}
 		} else {
 			order = &entity.OrderBookEvent{
+				Type:     entity.Update,
 				Exchange: entity.Poloniex,
 				Date:     time.Now(),
 				From:     c1,
