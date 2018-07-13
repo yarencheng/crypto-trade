@@ -13,7 +13,7 @@ import (
 
 type Sqlite struct {
 	Path       string
-	OrderBooks <-chan entity.OrderBook
+	OrderBooks <-chan entity.OrderBookEvent
 	db         *gorm.DB
 	stop       chan int
 	stopWg     sync.WaitGroup
@@ -42,7 +42,7 @@ func (s *Sqlite) Start() error {
 	logger.Infof("Started")
 
 	// Migrate the schema
-	db.AutoMigrate(&entity.OrderBook{})
+	db.AutoMigrate(&entity.OrderBookEvent{})
 	if s.db.Error != nil {
 		err = fmt.Errorf("Failed to migrate order. err: [%v]", s.db.Error)
 		logger.Warnf("%v", err)

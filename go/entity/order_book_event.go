@@ -7,16 +7,16 @@ import (
 type OrderBookEventType string
 
 const (
-	Update      OrderBookEventType = "Update"
-	RemovePrice OrderBookEventType = "RemovePrice"
-	RemoveAll   OrderBookEventType = "RemoRemoveAllvePrice"
+	ExchangeRestart OrderBookEventType = "ExchangeRestart"
+	Update          OrderBookEventType = "Update"
 )
 
 type OrderBookEvent struct {
-	Type   OrderBookEventType
-	Date   time.Time
-	From   Currency
-	To     Currency
-	Price  float64
-	Volume float64
+	Type     OrderBookEventType
+	Date     time.Time
+	Exchange Exchange
+	From     Currency
+	To       Currency
+	Price    float64
+	Volume   float64
 }

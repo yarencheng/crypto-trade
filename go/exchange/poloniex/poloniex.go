@@ -19,7 +19,7 @@ import (
 
 type Poloniex struct {
 	Currencies  []entity.Currency
-	OrderBooks  chan<- entity.OrderBook
+	OrderBooks  chan<- entity.OrderBookEvent
 	stop        chan int
 	stopWg      sync.WaitGroup
 	wsSeqenceID map[int64]int64 // key: channel_id, value sequence
@@ -117,6 +117,8 @@ func (p *Poloniex) listenWebSocket() error {
 		logger.Warnf("%v", err)
 		return err
 	}
+
+	p.onWebSocketConnected()
 
 	logger.Infof("Connected to [%v]", url.String())
 
@@ -274,14 +276,19 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 
 			volume := vs.Float()
 
-			p.OrderBooks <- entity.OrderBook{
+			order := entity.OrderBookEvent{
+				Type:     entity.Update,
 				Exchange: entity.Poloniex,
-				Time:     time.Now(),
+				Date:     time.Now(),
 				From:     c2,
 				To:       c1,
 				Price:    1 / price,
 				Volume:   price * volume,
 			}
+
+			logger.Debugf("Receive order [%v]", order)
+
+			p.OrderBooks <- order
 		}
 
 		for ps, vs := range bids.Map() {
@@ -293,14 +300,19 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 
 			volume := vs.Float()
 
-			p.OrderBooks <- entity.OrderBook{
+			order := entity.OrderBookEvent{
+				Type:     entity.Update,
 				Exchange: entity.Poloniex,
-				Time:     time.Now(),
+				Date:     time.Now(),
 				From:     c1,
 				To:       c2,
 				Price:    price,
 				Volume:   volume,
 			}
+
+			logger.Debugf("Receive order [%v]", order)
+
+			p.OrderBooks <- order
 		}
 
 	case "o":
@@ -313,20 +325,21 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 		price := ar[2].Float()
 		volume := ar[3].Float()
 
-		var order *entity.OrderBook
+		var order *entity.OrderBookEvent
 		if isAsk {
-			order = &entity.OrderBook{
+			order = &entity.OrderBookEvent{
+				Type:     entity.Update,
 				Exchange: entity.Poloniex,
-				Time:     time.Now(),
+				Date:     time.Now(),
 				From:     c2,
 				To:       c1,
 				Price:    1 / price,
 				Volume:   price * volume,
 			}
 		} else {
-			order = &entity.OrderBook{
+			order = &entity.OrderBookEvent{
 				Exchange: entity.Poloniex,
-				Time:     time.Now(),
+				Date:     time.Now(),
 				From:     c1,
 				To:       c2,
 				Price:    price,
@@ -348,5 +361,13 @@ func pairToChannelID(pair sets.Set) (string, bool) {
 		return "148", true
 	} else {
 		return "", false
+	}
+}
+
+func (p *Poloniex) onWebSocketConnected() {
+	p.OrderBooks <- entity.OrderBookEvent{
+		Exchange: entity.Poloniex,
+		Date:     time.Now(),
+		Type:     entity.ExchangeRestart,
 	}
 }

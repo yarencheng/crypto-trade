@@ -54,7 +54,7 @@ func main() {
 		},
 	}, &v1.Channel{
 		ID:   "orders",
-		Type: v1.T(entity.OrderBook{}),
+		Type: v1.T(entity.OrderBookEvent{}),
 		Size: 1000,
 	})
 
