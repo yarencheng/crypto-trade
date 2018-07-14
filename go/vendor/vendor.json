@@ -81,6 +81,14 @@
 			"versionExact": "v1.2.0"
 		},
 		{
+			"checksumSHA1": "HMoZ70PrmL9dN5Kxs0dyZa/Z5k4=",
+			"path": "github.com/imdario/mergo",
+			"revision": "9316a62528ac99aaecb4e47eadd6dc8aa6533d58",
+			"revisionTime": "2018-06-08T14:01:56Z",
+			"version": "v0",
+			"versionExact": "v0.3.5"
+		},
+		{
 			"checksumSHA1": "IPuI0TCUlOnJGLYWyJDDH6xbtZg=",
 			"path": "github.com/jinzhu/gorm",
 			"revision": "6ed508ec6a4ecb3531899a69cbc746ccf65a4166",
@@ -159,6 +167,14 @@
 		{
 			"checksumSHA1": "wnEANt4k5X/KGwoFyfSSnpxULm4=",
 			"path": "github.com/stretchr/testify/require",
+			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
+			"revisionTime": "2018-05-06T18:05:49Z",
+			"version": "v1",
+			"versionExact": "v1.2.2"
+		},
+		{
+			"checksumSHA1": "uefllr2OtKBGo/kQSAPbW3w6p0A=",
+			"path": "github.com/stretchr/testify/suite",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
 			"revisionTime": "2018-05-06T18:05:49Z",
 			"version": "v1",
