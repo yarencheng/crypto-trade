@@ -123,8 +123,12 @@ func (ws *WebSocket) Start() error {
 				return nil
 			})
 
+			wg := sync.WaitGroup{}
+
 			readError := make(chan int, 1)
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				for {
 					var o interface{}
 					err = client.ReadJSON(&o)
@@ -155,47 +159,49 @@ func (ws *WebSocket) Start() error {
 				err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "See you!"))
 				if err != nil {
 					logger.Warnf("[%v] Failed to send closing message. err: [%v]", ws.config.Name, err)
+					return
 				}
 
 				err = client.Close()
-
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
+					return
 				}
+
 				return
 			case <-socketClose:
 				err = client.Close()
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
+					return
 				}
 
 				ws.closedCount++
 				ws.config.EventHandler.OnClosed()
 
-				if ws.config.Reconnect.OnClosed == "true" {
-					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
-					time.Sleep(time.Second)
-					continue
-				} else {
+				if ws.config.Reconnect.OnClosed != "true" {
 					return
 				}
 			case <-readError:
 				err = client.Close()
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
+					return
 				}
 
 				ws.readErrorCount++
 				ws.config.EventHandler.OnReadError()
 
-				if ws.config.Reconnect.OnReadError == "true" {
-					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
-					time.Sleep(time.Second)
-					continue
-				} else {
+				if ws.config.Reconnect.OnReadError != "true" {
 					return
 				}
 			}
+
+			logger.Debugf("Wait read/write goroutine to finish")
+			wg.Wait()
+
+			logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
+			time.Sleep(time.Second)
 		}
 
 	}()
