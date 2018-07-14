@@ -2,10 +2,13 @@ package websocket
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/gorilla/websocket"
 	"github.com/imdario/mergo"
@@ -62,13 +65,15 @@ type WebSocket struct {
 	connectFailedCount int
 	readErrorCount     int
 	writeErrorCount    int
+	readChan           chan *gjson.Result
 }
 
 func New(c *Config) *WebSocket {
 
 	ws := &WebSocket{
-		config: Default,
-		stop:   make(chan int, 1),
+		config:   Default,
+		stop:     make(chan int, 1),
+		readChan: make(chan *gjson.Result, 100),
 	}
 
 	if c != nil {
@@ -118,17 +123,30 @@ func (ws *WebSocket) Start() error {
 				return nil
 			})
 
+			readError := make(chan int, 1)
 			go func() {
 				for {
-					t, m, e := client.ReadMessage()
-					// TODO
-					logger.Errorf("aaaaaa t=%v", t)
-					logger.Errorf("aaaaaa m=%v", string(m))
-					logger.Errorf("aaaaaa e=%v", e)
-					if e != nil {
-						logger.Errorf("_____")
+					var o interface{}
+					err = client.ReadJSON(&o)
+					if err != nil {
+						if we, ok := err.(*websocket.CloseError); ok {
+							logger.Infof("[%v] read a closing message: [%v:%v]", ws.config.Name, we.Code, we.Text)
+						} else {
+							logger.Errorf("[%v] read JSON failed. err [%v]", ws.config.Name, err)
+							close(readError)
+						}
 						return
 					}
+					logger.Debugf("[%v] read JSON: [%#v]", ws.config.Name, o)
+
+					j, err := json.Marshal(o)
+					if err != nil {
+						logger.Errorf("[%v] Failed to marshal json [%v]. err: [%v]", o, err)
+						close(readError)
+					}
+
+					gj := gjson.ParseBytes(j)
+					ws.readChan <- &gj
 				}
 			}()
 
@@ -155,6 +173,22 @@ func (ws *WebSocket) Start() error {
 				ws.config.EventHandler.OnClosed()
 
 				if ws.config.Reconnect.OnClosed == "true" {
+					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
+					time.Sleep(time.Second)
+					continue
+				} else {
+					return
+				}
+			case <-readError:
+				err = client.Close()
+				if err != nil {
+					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
+				}
+
+				ws.readErrorCount++
+				ws.config.EventHandler.OnReadError()
+
+				if ws.config.Reconnect.OnReadError == "true" {
 					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
 					time.Sleep(time.Second)
 					continue
@@ -189,6 +223,10 @@ func (ws *WebSocket) Stop(ctx context.Context) error {
 		logger.Infof("[%v] stopped.", ws.config.Name)
 		return nil
 	}
+}
+
+func (ws *WebSocket) Read() <-chan *gjson.Result {
+	return ws.readChan
 }
 
 func (ws *WebSocket) ClosedCount() int {
