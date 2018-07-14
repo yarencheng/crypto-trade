@@ -60,20 +60,21 @@ type WebSocket struct {
 	config             Config
 	stop               chan int
 	stopWg             sync.WaitGroup
-	client             *websocket.Conn
 	closedCount        int
 	connectFailedCount int
 	readErrorCount     int
 	writeErrorCount    int
 	readChan           chan *gjson.Result
+	writeChan          chan *gjson.Result
 }
 
 func New(c *Config) *WebSocket {
 
 	ws := &WebSocket{
-		config:   Default,
-		stop:     make(chan int, 1),
-		readChan: make(chan *gjson.Result, 100),
+		config:    Default,
+		stop:      make(chan int, 1),
+		readChan:  make(chan *gjson.Result, 100),
+		writeChan: make(chan *gjson.Result, 100),
 	}
 
 	if c != nil {
@@ -114,7 +115,6 @@ func (ws *WebSocket) Start() error {
 					return
 				}
 			}
-			ws.client = client
 
 			socketClose := make(chan int, 1)
 			client.SetCloseHandler(func(code int, message string) error {
@@ -145,12 +145,33 @@ func (ws *WebSocket) Start() error {
 
 					j, err := json.Marshal(o)
 					if err != nil {
-						logger.Errorf("[%v] Failed to marshal json [%v]. err: [%v]", o, err)
+						logger.Errorf("[%v] Failed to marshal JSON [%v]. err: [%v]", ws.config.Name, o, err)
 						close(readError)
 					}
 
 					gj := gjson.ParseBytes(j)
 					ws.readChan <- &gj
+				}
+			}()
+
+			writeError := make(chan int, 1)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					gj, ok := <-ws.writeChan
+					if !ok {
+						return
+					}
+
+					logger.Debugf("[%v] read JSON: [%v]", ws.config.Name, gj.String())
+
+					err := client.WriteJSON(gj.Value())
+					if err != nil {
+						logger.Errorf("[%v] Failed to write JSON [%v]. err: [%v]", ws.config.Name, gj.String(), err)
+						close(writeError)
+						return
+					}
 				}
 			}()
 
@@ -197,11 +218,17 @@ func (ws *WebSocket) Start() error {
 				}
 			}
 
+			close(ws.readChan)
+			close(ws.writeChan)
+
 			logger.Debugf("Wait read/write goroutine to finish")
 			wg.Wait()
 
 			logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
 			time.Sleep(time.Second)
+
+			ws.readChan = make(chan *gjson.Result, 100)
+			ws.writeChan = make(chan *gjson.Result, 100)
 		}
 
 	}()
@@ -231,8 +258,18 @@ func (ws *WebSocket) Stop(ctx context.Context) error {
 	}
 }
 
-func (ws *WebSocket) Read() <-chan *gjson.Result {
-	return ws.readChan
+func (ws *WebSocket) Read() (*gjson.Result, bool) {
+	gj, ok := <-ws.readChan
+	return gj, ok
+}
+
+func (ws *WebSocket) Write(gj *gjson.Result) bool {
+	select {
+	case ws.writeChan <- gj:
+		return true
+	default:
+		return false
+	}
 }
 
 func (ws *WebSocket) ClosedCount() int {

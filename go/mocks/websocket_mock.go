@@ -34,6 +34,7 @@ type WebSocketMock struct {
 	assertErr       []error
 	clientCount     int
 	clientCountLock sync.Mutex
+	done            chan int
 }
 
 func NewWebSocketMock() *WebSocketMock {
@@ -41,6 +42,7 @@ func NewWebSocketMock() *WebSocketMock {
 	mock := &WebSocketMock{
 		events:    make([]event, 0),
 		assertErr: make([]error, 0),
+		done:      make(chan int, 1),
 	}
 
 	mock.server = httptest.NewServer(http.HandlerFunc(mock.handler))
@@ -50,6 +52,10 @@ func NewWebSocketMock() *WebSocketMock {
 
 func (mock *WebSocketMock) Close() {
 	mock.server.Close()
+}
+
+func (mock *WebSocketMock) Done() <-chan int {
+	return mock.done
 }
 
 func (mock *WebSocketMock) Assert(t *testing.T) {
@@ -116,7 +122,7 @@ func (mock *WebSocketMock) ReceiveJSON(messages ...string) *WebSocketMock {
 }
 
 func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
-
+	defer close(mock.done)
 	{
 		mock.clientCountLock.Lock()
 		defer mock.clientCountLock.Unlock()
