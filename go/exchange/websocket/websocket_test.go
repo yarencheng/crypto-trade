@@ -29,6 +29,8 @@ func TestWebSocketTestSuite(t *testing.T) {
 
 func (s *WebSocketTestSuite) SetupTest() {
 
+	s.in = make(chan gjson.Result, 10)
+
 	s.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		c, err := upgrader.Upgrade(w, r, nil)
@@ -36,16 +38,21 @@ func (s *WebSocketTestSuite) SetupTest() {
 			return
 		}
 		defer c.Close()
+		c.ReadJSON
 
-		s.in = make(chan gjson.Result, 10)
+		// s.in = make(chan gjson.Result, 10)
 
 		go func() {
 			for {
+				fmt.Printf("aaa 0 \n")
 				j, ok := <-s.in
+				fmt.Printf("aaa 1 %v %v\n", j, ok)
 				if !ok {
 					break
 				}
+				fmt.Printf("aaa 2 \n")
 				err := c.WriteJSON(j.String())
+				fmt.Printf("aaa 3 \n")
 				s.NoError(err)
 			}
 		}()
@@ -53,6 +60,9 @@ func (s *WebSocketTestSuite) SetupTest() {
 		for {
 			_, message, err := c.ReadMessage()
 			fmt.Printf("message: [%v], err: [%v]\n", string(message), err)
+			if err != nil {
+				break
+			}
 		}
 	}))
 
@@ -109,5 +119,8 @@ func (s *WebSocketTestSuite) TestCloseEvent() {
 		s.Require().NoError(ws.Stop(ctx))
 	}()
 
-	time.Sleep(5 * time.Second)
+	s.server.Close()
+
+	time.Sleep(2 * time.Second)
+
 }

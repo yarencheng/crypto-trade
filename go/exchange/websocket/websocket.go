@@ -98,7 +98,7 @@ func (ws *WebSocket) Start() error {
 
 			select {
 			case <-ws.stop:
-				err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "See you!"))
 				if err != nil {
 					logger.Warnf("[%v] Failed to send closing message. err: [%v]", ws.config.Name, err)
 				}
