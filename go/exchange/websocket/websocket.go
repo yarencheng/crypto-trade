@@ -118,6 +118,20 @@ func (ws *WebSocket) Start() error {
 				return nil
 			})
 
+			go func() {
+				for {
+					t, m, e := client.ReadMessage()
+					// TODO
+					logger.Errorf("aaaaaa t=%v", t)
+					logger.Errorf("aaaaaa m=%v", string(m))
+					logger.Errorf("aaaaaa e=%v", e)
+					if e != nil {
+						logger.Errorf("_____")
+						return
+					}
+				}
+			}()
+
 			select {
 			case <-ws.stop:
 				err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "See you!"))
@@ -125,7 +139,6 @@ func (ws *WebSocket) Start() error {
 					logger.Warnf("[%v] Failed to send closing message. err: [%v]", ws.config.Name, err)
 				}
 
-				ws.closedCount++
 				err = client.Close()
 
 				if err != nil {
@@ -137,7 +150,10 @@ func (ws *WebSocket) Start() error {
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
 				}
+
+				ws.closedCount++
 				ws.config.EventHandler.OnClosed()
+
 				if ws.config.Reconnect.OnClosed == "true" {
 					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
 					time.Sleep(time.Second)

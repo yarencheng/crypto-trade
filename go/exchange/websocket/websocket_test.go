@@ -10,18 +10,7 @@ import (
 	"github.com/yarencheng/crypto-trade/go/mocks"
 
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
-
-type WebSocketTestSuite struct {
-	suite.Suite
-	wsMock *mocks.WebSocketMock
-}
-
-func TestWebSocketTestSuite(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, &WebSocketTestSuite{})
-}
 
 func Test_Start(t *testing.T) {
 	t.Parallel()
@@ -56,17 +45,19 @@ func Test_Close(t *testing.T) {
 	// arrange
 	wsMock := mocks.NewWebSocketMock()
 	defer wsMock.Close()
+	closed := make(chan int, 1)
 	ws := New(&Config{
 		URL: *wsMock.URL(),
 		Reconnect: Reconnect{
 			OnClosed:      "false",
 			OnConnectFail: "false",
 		},
+		EventHandler: EventHandler{
+			OnClosed: func() {
+				close(closed)
+			},
+		},
 	})
-
-	// time.Sleep(time.Second * 2)
-
-	// wsMock.Close()
 
 	// action
 	err := ws.Start()
@@ -77,9 +68,14 @@ func Test_Close(t *testing.T) {
 		require.NoError(t, ws.Stop(ctx))
 	}()
 
-	time.Sleep(time.Second * 2)
-	wsMock.Close()
-	time.Sleep(time.Second * 2)
+	// assert
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+	case <-closed:
+	}
 
 	assert.Equal(t, 1, ws.ClosedCount())
+	assert.NoError(t, ctx.Err())
 }
