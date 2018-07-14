@@ -2,24 +2,20 @@ package websocket
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
-	"github.com/tidwall/gjson"
+	"github.com/stretchr/testify/assert"
 
-	"github.com/gorilla/websocket"
+	"github.com/yarencheng/crypto-trade/go/mocks"
+
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
 type WebSocketTestSuite struct {
 	suite.Suite
-	server *httptest.Server
-	url    *url.URL
-	in     chan gjson.Result
+	wsMock *mocks.WebSocketMock
 }
 
 func TestWebSocketTestSuite(t *testing.T) {
@@ -27,62 +23,14 @@ func TestWebSocketTestSuite(t *testing.T) {
 	suite.Run(t, &WebSocketTestSuite{})
 }
 
-func (s *WebSocketTestSuite) SetupTest() {
+func Test_Start(t *testing.T) {
+	t.Parallel()
 
-	s.in = make(chan gjson.Result, 10)
-
-	s.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{}
-		c, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer c.Close()
-		c.ReadJSON
-
-		// s.in = make(chan gjson.Result, 10)
-
-		go func() {
-			for {
-				fmt.Printf("aaa 0 \n")
-				j, ok := <-s.in
-				fmt.Printf("aaa 1 %v %v\n", j, ok)
-				if !ok {
-					break
-				}
-				fmt.Printf("aaa 2 \n")
-				err := c.WriteJSON(j.String())
-				fmt.Printf("aaa 3 \n")
-				s.NoError(err)
-			}
-		}()
-
-		for {
-			_, message, err := c.ReadMessage()
-			fmt.Printf("message: [%v], err: [%v]\n", string(message), err)
-			if err != nil {
-				break
-			}
-		}
-	}))
-
-	u, err := url.Parse(s.server.URL)
-	s.Require().NoError(err)
-	u.Scheme = "ws"
-
-	s.url = u
-}
-
-func (s *WebSocketTestSuite) TearDownTest() {
-	close(s.in)
-	s.server.Close()
-}
-
-func (s *WebSocketTestSuite) TestStart() {
 	// arrange
+	wsMock := mocks.NewWebSocketMock()
+	defer wsMock.Close()
 	ws := New(&Config{
-		URL:  *s.url,
-		Name: "WebSocketTestSuite",
+		URL: *wsMock.URL(),
 		Reconnect: Reconnect{
 			OnClosed:      "false",
 			OnConnectFail: "false",
@@ -91,36 +39,47 @@ func (s *WebSocketTestSuite) TestStart() {
 
 	// action
 	err := ws.Start()
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		s.Require().NoError(ws.Stop(ctx))
+		require.NoError(t, ws.Stop(ctx))
 	}()
+
+	// assert
+	assert.Equal(t, 0, ws.ConnectFailedCount())
 }
 
-func (s *WebSocketTestSuite) TestCloseEvent() {
+func Test_Close(t *testing.T) {
+	t.Parallel()
+
 	// arrange
+	wsMock := mocks.NewWebSocketMock()
+	defer wsMock.Close()
 	ws := New(&Config{
-		URL:  *s.url,
-		Name: "WebSocketTestSuite",
+		URL: *wsMock.URL(),
 		Reconnect: Reconnect{
 			OnClosed:      "false",
 			OnConnectFail: "false",
 		},
 	})
 
+	// time.Sleep(time.Second * 2)
+
+	// wsMock.Close()
+
 	// action
 	err := ws.Start()
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		s.Require().NoError(ws.Stop(ctx))
+		require.NoError(t, ws.Stop(ctx))
 	}()
 
-	s.server.Close()
+	time.Sleep(time.Second * 2)
+	wsMock.Close()
+	time.Sleep(time.Second * 2)
 
-	time.Sleep(2 * time.Second)
-
+	assert.Equal(t, 1, ws.ClosedCount())
 }

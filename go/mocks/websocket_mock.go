@@ -136,6 +136,7 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 		panic(s)
 	}
 	defer c.Close()
+	defer c.WriteMessage(websocket.CloseMessage, []byte("See you!"))
 
 	for _, event := range mock.events {
 		switch event.tvpe {
@@ -190,4 +191,5 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 			panic(s)
 		}
 	}
+
 }

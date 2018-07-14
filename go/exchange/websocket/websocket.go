@@ -13,9 +13,10 @@ import (
 )
 
 type Config struct {
-	URL       url.URL
-	Name      string
-	Reconnect Reconnect
+	URL          url.URL
+	Name         string
+	Reconnect    Reconnect
+	EventHandler EventHandler
 }
 
 type Reconnect struct {
@@ -23,6 +24,13 @@ type Reconnect struct {
 	OnConnectFail string
 	OnReadError   string
 	OnWriteError  string
+}
+
+type EventHandler struct {
+	OnClosed      func()
+	OnConnectFail func()
+	OnReadError   func()
+	OnWriteError  func()
 }
 
 var Default Config = Config{
@@ -37,13 +45,23 @@ var Default Config = Config{
 		OnReadError:   "false",
 		OnWriteError:  "false",
 	},
+	EventHandler: EventHandler{
+		OnClosed:      func() {},
+		OnConnectFail: func() {},
+		OnReadError:   func() {},
+		OnWriteError:  func() {},
+	},
 }
 
 type WebSocket struct {
-	config Config
-	stop   chan int
-	stopWg sync.WaitGroup
-	client *websocket.Conn
+	config             Config
+	stop               chan int
+	stopWg             sync.WaitGroup
+	client             *websocket.Conn
+	closedCount        int
+	connectFailedCount int
+	readErrorCount     int
+	writeErrorCount    int
 }
 
 func New(c *Config) *WebSocket {
@@ -79,6 +97,10 @@ func (ws *WebSocket) Start() error {
 			if err != nil {
 				err = fmt.Errorf("[%v] Dial to [%v] failed. err: [%v]", ws.config.Name, ws.config.URL.String(), err)
 				logger.Warnf("%v", err)
+
+				ws.connectFailedCount++
+				ws.config.EventHandler.OnConnectFail()
+
 				if ws.config.Reconnect.OnConnectFail == "true" {
 					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
 					time.Sleep(time.Second)
@@ -102,7 +124,10 @@ func (ws *WebSocket) Start() error {
 				if err != nil {
 					logger.Warnf("[%v] Failed to send closing message. err: [%v]", ws.config.Name, err)
 				}
+
+				ws.closedCount++
 				err = client.Close()
+
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
 				}
@@ -112,6 +137,7 @@ func (ws *WebSocket) Start() error {
 				if err != nil {
 					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
 				}
+				ws.config.EventHandler.OnClosed()
 				if ws.config.Reconnect.OnClosed == "true" {
 					logger.Infof("[%v] Reconnect after 1 second", ws.config.Name)
 					time.Sleep(time.Second)
@@ -147,4 +173,20 @@ func (ws *WebSocket) Stop(ctx context.Context) error {
 		logger.Infof("[%v] stopped.", ws.config.Name)
 		return nil
 	}
+}
+
+func (ws *WebSocket) ClosedCount() int {
+	return ws.closedCount
+}
+
+func (ws *WebSocket) ConnectFailedCount() int {
+	return ws.connectFailedCount
+}
+
+func (ws *WebSocket) ReadErrorCount() int {
+	return ws.readErrorCount
+}
+
+func (ws *WebSocket) WriteErrorCount() int {
+	return ws.writeErrorCount
 }
