@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 	"github.com/yarencheng/crypto-trade/go/entity"
+	exws "github.com/yarencheng/crypto-trade/go/exchange/websocket"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
@@ -24,12 +25,23 @@ type Poloniex struct {
 	stopWg      sync.WaitGroup
 	wsSeqenceID map[int64]int64 // key: channel_id, value sequence
 	subChannels []string
+	ws          *exws.WebSocket
 }
 
 func New() *Poloniex {
 	b := &Poloniex{
 		stop:        make(chan int, 1),
 		subChannels: make([]string, 0),
+		ws: exws.New(&exws.Config{
+			URL: url.URL{
+				Scheme: "wss",
+				Host:   "api2.poloniex.com",
+			},
+			Reconnect: exws.Reconnect{
+				OnClosed:      "false",
+				OnConnectFail: "false",
+			},
+		}),
 	}
 	return b
 }

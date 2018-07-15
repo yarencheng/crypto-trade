@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -54,17 +56,37 @@ func (mock *WebSocketMock) Close() {
 	mock.server.Close()
 }
 
-func (mock *WebSocketMock) Done() <-chan int {
-	return mock.done
-}
+func (mock *WebSocketMock) Assert(t *testing.T, ctxs ...context.Context) {
 
-func (mock *WebSocketMock) Assert(t *testing.T) {
 	t.Helper()
 
-	mock.clientCountLock.Lock()
-	defer mock.clientCountLock.Unlock()
-	if mock.clientCount == 0 && len(mock.events) > 0 {
-		t.Error("No any incoming connection")
+	{
+		mock.clientCountLock.Lock()
+		defer mock.clientCountLock.Unlock()
+		if mock.clientCount == 0 {
+			if len(mock.events) > 0 {
+				t.Error("No any incoming connection")
+				return
+			} else {
+				return
+			}
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if len(ctxs) != 0 {
+		ctx = ctxs[0]
+	}
+
+	select {
+	case <-ctx.Done():
+		if err := ctx.Err(); err != nil {
+			t.Errorf("WebSocketMock didn't receive a incoming connection. err: [%v]", err)
+			t.Fail()
+		}
+	case <-mock.done:
 	}
 
 	for _, e := range mock.assertErr {
