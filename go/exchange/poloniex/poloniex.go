@@ -32,23 +32,31 @@ func New() *Poloniex {
 	b := &Poloniex{
 		stop:        make(chan int, 1),
 		subChannels: make([]string, 0),
-		ws: exws.New(&exws.Config{
-			URL: url.URL{
-				Scheme: "wss",
-				Host:   "api2.poloniex.com",
-			},
-			Reconnect: exws.Reconnect{
-				OnClosed:      "false",
-				OnConnectFail: "false",
-			},
-		}),
 	}
+
+	b.ws = exws.New(&exws.Config{
+		Name: "Poloniex",
+		URL: url.URL{
+			Scheme: "wss",
+			Host:   "api2.poloniex.com",
+		},
+		EventHandler: exws.EventHandler{
+			OnConnect: b.OnWsConnect,
+		},
+	})
+
 	return b
 }
 
 func (p *Poloniex) Start() error {
 	logger.Info("Starting")
-	defer logger.Info("Started")
+
+	err := p.ws.Start()
+	if err != nil {
+		err = fmt.Errorf("Start websocket failed. err: [%v]", err)
+		logger.Errorf("%v", err)
+		return err
+	}
 
 	ids := hashset.New()
 	for _, c1 := range p.Currencies {
@@ -67,38 +75,24 @@ func (p *Poloniex) Start() error {
 		p.subChannels = append(p.subChannels, id.(string))
 	}
 
-	p.stopWg.Add(1)
-	go func() {
-		defer p.stopWg.Done()
-
-		for {
-			logger.Infof("Listening to web socket")
-
-			err := p.listenWebSocket()
-
-			if err != nil {
-				logger.Warnf("Got an error; not restart web socket. err: [%v]", err)
-				return
-			}
-
-			select {
-			case <-p.stop:
-				return
-			default:
-				logger.Infof("Restart web socket")
-			}
-		}
-
-	}()
+	logger.Info("Started")
 
 	return nil
 }
 
 func (p *Poloniex) Stop(ctx context.Context) error {
 	logger.Info("Stopping")
-	defer logger.Info("Stopped")
 
 	wait := make(chan int, 1)
+
+	p.stopWg.Add(1)
+	go func() {
+		defer p.stopWg.Done()
+		err := p.ws.Stop(ctx)
+		if err != nil {
+			logger.Errorf("Stop web socket failed. err: [%v]", err)
+		}
+	}()
 
 	go func() {
 		close(p.stop)
@@ -110,7 +104,17 @@ func (p *Poloniex) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-wait:
+		logger.Info("Stopped")
 		return nil
+	}
+}
+
+func (p *Poloniex) OnWsConnect() {
+	logger.Infof("Web socket connected")
+	p.OrderBooks <- entity.OrderBookEvent{
+		Exchange: entity.Poloniex,
+		Date:     time.Now(),
+		Type:     entity.ExchangeRestart,
 	}
 }
 
@@ -130,7 +134,7 @@ func (p *Poloniex) listenWebSocket() error {
 		return err
 	}
 
-	p.onWebSocketConnected()
+	p.OnWsConnect()
 
 	logger.Infof("Connected to [%v]", url.String())
 
@@ -374,13 +378,5 @@ func pairToChannelID(pair sets.Set) (string, bool) {
 		return "148", true
 	} else {
 		return "", false
-	}
-}
-
-func (p *Poloniex) onWebSocketConnected() {
-	p.OrderBooks <- entity.OrderBookEvent{
-		Exchange: entity.Poloniex,
-		Date:     time.Now(),
-		Type:     entity.ExchangeRestart,
 	}
 }

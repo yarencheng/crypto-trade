@@ -150,13 +150,5 @@ func Test_Write(t *testing.T) {
 	gj := gjson.Parse(`{"aa":"AA"}`)
 	ws.Write(&gj)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	select {
-	case <-ctx.Done():
-	case <-wsMock.Done():
-	}
-
-	require.NoError(t, ctx.Err())
 	wsMock.Assert(t)
 }

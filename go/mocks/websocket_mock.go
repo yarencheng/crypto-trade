@@ -62,15 +62,11 @@ func (mock *WebSocketMock) Assert(t *testing.T, ctxs ...context.Context) {
 
 	{
 		mock.clientCountLock.Lock()
-		defer mock.clientCountLock.Unlock()
-		if mock.clientCount == 0 {
-			if len(mock.events) > 0 {
-				t.Error("No any incoming connection")
-				return
-			} else {
-				return
-			}
+		if len(mock.events) == 0 {
+			mock.clientCountLock.Unlock()
+			return
 		}
+		mock.clientCountLock.Unlock()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -147,14 +143,15 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 	defer close(mock.done)
 	{
 		mock.clientCountLock.Lock()
-		defer mock.clientCountLock.Unlock()
 		mock.clientCount++
 		if mock.clientCount == 2 {
 			mock.assertErr = append(mock.assertErr, fmt.Errorf("This mock only support one connection."))
 		}
 		if mock.clientCount >= 2 {
+			mock.clientCountLock.Unlock()
 			return
 		}
+		mock.clientCountLock.Unlock()
 	}
 
 	upgrader := websocket.Upgrader{}

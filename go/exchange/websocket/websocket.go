@@ -31,6 +31,7 @@ type Reconnect struct {
 
 type EventHandler struct {
 	OnClosed      func()
+	OnConnect     func()
 	OnConnectFail func()
 	OnReadError   func()
 	OnWriteError  func()
@@ -50,6 +51,7 @@ var Default Config = Config{
 	},
 	EventHandler: EventHandler{
 		OnClosed:      func() {},
+		OnConnect:     func() {},
 		OnConnectFail: func() {},
 		OnReadError:   func() {},
 		OnWriteError:  func() {},
@@ -115,6 +117,9 @@ func (ws *WebSocket) Start() error {
 					return
 				}
 			}
+
+			logger.Infof("[%v] Connected to [%v]", ws.config.Name, ws.config.URL.String())
+			ws.config.EventHandler.OnConnect()
 
 			socketClose := make(chan int, 1)
 			client.SetCloseHandler(func(code int, message string) error {
@@ -214,6 +219,19 @@ func (ws *WebSocket) Start() error {
 				ws.config.EventHandler.OnReadError()
 
 				if ws.config.Reconnect.OnReadError != "true" {
+					return
+				}
+			case <-writeError:
+				err = client.Close()
+				if err != nil {
+					logger.Errorf("[%v] Failed to close socket. err: [%v]", ws.config.Name, err)
+					return
+				}
+
+				ws.writeErrorCount++
+				ws.config.EventHandler.OnWriteError()
+
+				if ws.config.Reconnect.OnWriteError != "true" {
 					return
 				}
 			}
