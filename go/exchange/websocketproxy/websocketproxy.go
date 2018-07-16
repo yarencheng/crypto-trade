@@ -75,7 +75,6 @@ type WebSocketProxy struct {
 	state  state
 	conn   *websocket.Conn
 	events chan *event
-	errors chan *Error
 }
 
 func New(c *Config) *WebSocketProxy {
@@ -84,7 +83,6 @@ func New(c *Config) *WebSocketProxy {
 		config: Default,
 		state:  disconnected,
 		events: make(chan *event, 10),
-		errors: make(chan *Error, 10),
 	}
 
 	if c != nil {
@@ -111,7 +109,7 @@ func (this *WebSocketProxy) Stop(ctx context.Context) error {
 	go func() {
 		close(this.events)
 		this.stopWg.Wait()
-		if this.conn != nil {
+		if this.state == connected {
 			err := this.conn.Close()
 			if err != nil {
 				logger.Warnf("Disconnect to [%v] failed. err: [%v]", this.config.URL.String(), err)
@@ -131,15 +129,6 @@ func (this *WebSocketProxy) Stop(ctx context.Context) error {
 
 	logger.Infof("Stopped.")
 	return nil
-}
-
-func (this *WebSocketProxy) Error() error {
-	select {
-	case err := <-this.errors:
-		return err
-	default:
-		return nil
-	}
 }
 
 func (this *WebSocketProxy) Connect() error {
@@ -210,7 +199,6 @@ func (this *WebSocketProxy) worker() {
 			conn, _, err := websocket.DefaultDialer.Dial(this.config.URL.String(), nil)
 			if err != nil {
 				logger.Warnf("Connect to [%v] failed. err: [%v]", this.config.URL.String(), err)
-				this.errors <- newError(ConnectionError, err)
 				e.callback(newError(ConnectionError, err))
 				this.state = disconnected
 				continue
@@ -235,7 +223,6 @@ func (this *WebSocketProxy) worker() {
 			err := this.conn.Close()
 			if err != nil {
 				logger.Warnf("Disconnect to [%v] failed. err: [%v]", this.config.URL.String(), err)
-				this.errors <- newError(ConnectionError, err)
 				e.callback(newError(ConnectionError, err))
 				this.state = disconnected
 				continue
