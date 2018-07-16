@@ -2,6 +2,7 @@ package websocketproxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sync"
@@ -17,6 +18,7 @@ import (
 type Config struct {
 	URL          url.URL
 	PingInterval time.Duration
+	BufferSize   int
 }
 
 var Default Config = Config{
@@ -25,6 +27,7 @@ var Default Config = Config{
 		Host:   "...example.com",
 	},
 	PingInterval: 5 * time.Second,
+	BufferSize:   100,
 }
 
 type command string
@@ -76,12 +79,16 @@ func (e *Error) Error() string {
 
 type WebSocketProxy struct {
 	config           Config
+	readStop         chan int
+	readWg           sync.WaitGroup
 	pingStop         chan int
 	pingWg           sync.WaitGroup
 	workerWg         sync.WaitGroup
 	state            state
 	conn             *websocket.Conn
 	events           chan *event
+	in               chan *gjson.Result
+	out              chan *gjson.Result
 	connectedFn      func(in <-chan *gjson.Result, out chan<- *gjson.Result)
 	connectedFnLock  sync.Mutex
 	pingFailedFn     func(delay time.Duration)
@@ -231,9 +238,18 @@ func (this *WebSocketProxy) worker() {
 				this.pingWorker()
 			}()
 
+			this.readStop = make(chan int, 1)
+			this.readWg.Add(1)
+			this.in = make(chan *gjson.Result, this.config.BufferSize)
+			go func() {
+				defer this.readWg.Done()
+
+				this.readWorker()
+			}()
+
 			this.connectedFnLock.Lock()
 			if this.connectedFn != nil {
-				this.connectedFn(nil, nil)
+				this.connectedFn(this.in, nil)
 			}
 			this.connectedFnLock.Unlock()
 
@@ -249,7 +265,9 @@ func (this *WebSocketProxy) worker() {
 			this.state = disconnecting
 
 			close(this.pingStop)
+			close(this.readStop)
 			this.pingWg.Wait()
+			this.readWg.Wait()
 
 			err := this.conn.Close()
 			if err != nil {
@@ -279,17 +297,6 @@ func (this *WebSocketProxy) pingWorker() {
 		return nil
 	})
 	defer this.conn.SetPongHandler(nil)
-
-	// TODO: remove debug
-	go func() {
-		for {
-			t, m, e := this.conn.ReadMessage()
-			logger.Debugf("aaaa ReadMessage t=%v m=%v e=%v", t, string(m), e)
-			if e != nil {
-				return
-			}
-		}
-	}()
 
 	timep := func() *time.Time {
 		t := time.Now()
@@ -348,5 +355,53 @@ func (this *WebSocketProxy) pingWorker() {
 				}
 			}()
 		}
+	}
+}
+
+func (this *WebSocketProxy) readWorker() {
+
+	done := make(chan int, 1)
+
+	go func() {
+
+		defer close(this.in)
+		defer close(done)
+
+		for {
+			var j interface{}
+			err := this.conn.ReadJSON(&j)
+
+			if err != nil {
+				if we, ok := err.(*websocket.CloseError); ok {
+					switch we.Code {
+					case websocket.CloseNormalClosure:
+						logger.Infof("Remote server is closed(code=%v) with message [%v].", we.Code, we.Text)
+					default:
+						logger.Warnf("Remote server is closed(code=%v) with message [%v].", we.Code, we.Text)
+					}
+				} else {
+					logger.Warnf("Read JSON failed. err: [%v].", err)
+				}
+
+				return
+			}
+
+			b, err := json.Marshal(j)
+			if err != nil {
+				logger.Warnf("Failed to marshal json [%#v]. err: [%v]", j, err)
+				return
+			}
+
+			gj := gjson.ParseBytes(b)
+
+			logger.Debugf("Receive [%v]", gj.String())
+
+			this.in <- &gj
+		}
+	}()
+
+	select {
+	case <-this.readStop:
+	case <-done:
 	}
 }
