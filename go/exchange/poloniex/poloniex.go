@@ -9,12 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yarencheng/crypto-trade/go/exchange/websocketproxy"
+
 	"github.com/emirpasic/gods/sets"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 	"github.com/yarencheng/crypto-trade/go/entity"
-	exws "github.com/yarencheng/crypto-trade/go/exchange/websocket"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
@@ -25,7 +26,7 @@ type Poloniex struct {
 	stopWg      sync.WaitGroup
 	wsSeqenceID map[int64]int64 // key: channel_id, value sequence
 	subChannels []string
-	ws          *exws.WebSocket
+	ws          *websocketproxy.WebSocketProxy
 }
 
 func New() *Poloniex {
@@ -34,14 +35,10 @@ func New() *Poloniex {
 		subChannels: make([]string, 0),
 	}
 
-	b.ws = exws.New(&exws.Config{
-		Name: "Poloniex",
+	b.ws = websocketproxy.New(&websocketproxy.Config{
 		URL: url.URL{
 			Scheme: "wss",
 			Host:   "api2.poloniex.com",
-		},
-		EventHandler: exws.EventHandler{
-			OnConnect: b.OnWsConnect,
 		},
 	})
 
@@ -50,13 +47,6 @@ func New() *Poloniex {
 
 func (p *Poloniex) Start() error {
 	logger.Info("Starting")
-
-	err := p.ws.Start()
-	if err != nil {
-		err = fmt.Errorf("Start websocket failed. err: [%v]", err)
-		logger.Errorf("%v", err)
-		return err
-	}
 
 	ids := hashset.New()
 	for _, c1 := range p.Currencies {
@@ -73,6 +63,13 @@ func (p *Poloniex) Start() error {
 
 	for _, id := range ids.Values() {
 		p.subChannels = append(p.subChannels, id.(string))
+	}
+
+	err := p.ws.Connect()
+	if err != nil {
+		err = fmt.Errorf("Start websocket failed. err: [%v]", err)
+		logger.Errorf("%v", err)
+		return err
 	}
 
 	logger.Info("Started")
