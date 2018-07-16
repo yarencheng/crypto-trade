@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/tidwall/gjson"
 
@@ -72,13 +73,17 @@ func (e *Error) Error() string {
 }
 
 type WebSocketProxy struct {
-	config          Config
-	stopWg          sync.WaitGroup
-	state           state
-	conn            *websocket.Conn
-	events          chan *event
-	connectedFn     func(in <-chan *gjson.Result, out chan<- *gjson.Result)
-	connectedFnLock sync.Mutex
+	config           Config
+	pingStop         chan int
+	pingWg           sync.WaitGroup
+	workerWg         sync.WaitGroup
+	state            state
+	conn             *websocket.Conn
+	events           chan *event
+	connectedFn      func(in <-chan *gjson.Result, out chan<- *gjson.Result)
+	connectedFnLock  sync.Mutex
+	pingFailedFn     func(delay time.Duration)
+	pingFailedFnLock sync.Mutex
 }
 
 func New(c *Config) *WebSocketProxy {
@@ -97,9 +102,9 @@ func New(c *Config) *WebSocketProxy {
 
 	logger.Debugf("Use config [%#v]", ws.config)
 
-	ws.stopWg.Add(1)
+	ws.workerWg.Add(1)
 	go func() {
-		defer ws.stopWg.Done()
+		defer ws.workerWg.Done()
 		ws.worker()
 	}()
 
@@ -112,7 +117,7 @@ func (this *WebSocketProxy) Stop(ctx context.Context) error {
 	wait := make(chan int, 1)
 	go func() {
 		close(this.events)
-		this.stopWg.Wait()
+		this.workerWg.Wait()
 		if this.state == connected {
 			err := this.conn.Close()
 			if err != nil {
@@ -177,6 +182,12 @@ func (this *WebSocketProxy) SetConnectedHandler(fn func(in <-chan *gjson.Result,
 	this.connectedFn = fn
 }
 
+func (this *WebSocketProxy) SetPingFailedHandler(fn func(delay time.Duration)) {
+	this.pingFailedFnLock.Lock()
+	defer this.pingFailedFnLock.Unlock()
+	this.pingFailedFn = fn
+}
+
 func (this *WebSocketProxy) worker() {
 
 	for {
@@ -206,6 +217,13 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
+			this.pingStop = make(chan int, 1)
+			this.pingWg.Add(1)
+			go func() {
+				defer this.pingWg.Done()
+				this.pingWorker()
+			}()
+
 			logger.Infof("Connection to [%v] is established.", this.config.URL.String())
 			this.conn = conn
 			this.state = connected
@@ -228,6 +246,9 @@ func (this *WebSocketProxy) worker() {
 			logger.Infof("Connection is closing")
 			this.state = disconnecting
 
+			close(this.pingStop)
+			this.pingWg.Wait()
+
 			err := this.conn.Close()
 			if err != nil {
 				logger.Warnf("Disconnect to [%v] failed. err: [%v]", this.config.URL.String(), err)
@@ -242,6 +263,88 @@ func (this *WebSocketProxy) worker() {
 			e.callback(nil)
 
 		default:
+		}
+	}
+}
+
+func (this *WebSocketProxy) pingWorker() {
+
+	received := make(chan int, 1)
+	defer close(received)
+
+	this.conn.SetPongHandler(func(data string) error {
+		received <- 1
+		return nil
+	})
+	defer this.conn.SetPongHandler(nil)
+
+	// TODO: remove debug
+	go func() {
+		for {
+			t, m, e := this.conn.ReadMessage()
+			logger.Debugf("aaaa ReadMessage t=%v m=%v e=%v", t, string(m), e)
+			if e != nil {
+				return
+			}
+		}
+	}()
+
+	timep := func() *time.Time {
+		t := time.Now()
+		return &t
+	}
+
+	received <- 1
+	tLock := &sync.Mutex{}
+	t := timep()
+
+	for {
+		select {
+		case <-this.pingStop:
+			return
+		case <-received:
+
+			tLock.Lock()
+			start := *t
+			tLock.Unlock()
+
+			end := time.Now()
+			logger.Debugf("Receives a pong in [%v] seconds", end.Sub(start).Seconds())
+
+			delay := end.Sub(start)
+			if delay.Seconds() < 1 {
+				time.Sleep(time.Second - delay)
+			}
+
+			err := this.conn.WriteMessage(websocket.PingMessage, nil)
+
+			if err != nil {
+				logger.Warnf("Send ping message failed. err: [%v]", err)
+			}
+
+			tLock.Lock()
+			t = timep()
+			tLock.Unlock()
+
+			go func(o time.Time) {
+				time.Sleep(5 * time.Second)
+
+				tLock.Lock()
+				last := *t
+				tLock.Unlock()
+
+				delay_ := o.Sub(last)
+				if delay_.Seconds() > 5 {
+					logger.Warnf("It took too long for a pong in [%v] seconds", delay_.Seconds())
+
+					this.pingFailedFnLock.Lock()
+					defer this.pingFailedFnLock.Unlock()
+
+					if this.pingFailedFn != nil {
+						this.pingFailedFn(delay_)
+					}
+				}
+			}(*t)
 		}
 	}
 }

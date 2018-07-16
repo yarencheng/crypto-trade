@@ -128,3 +128,34 @@ func Test_SetConnectedHandler(t *testing.T) {
 	}
 	assert.NoError(t, ctx.Err())
 }
+
+func Test_SetPingFailedHandler(t *testing.T) {
+	t.Parallel()
+
+	// arrange: mock for web socket server
+	wsMock := mocks.NewWebSocketMock()
+	defer wsMock.Close()
+
+	// arrange: web socket proxy
+	ws := New(&Config{
+		URL: *wsMock.URL(),
+	})
+	defer ws.Stop(context.Background())
+
+	// action
+	called := make(chan int, 1)
+	ws.SetPingFailedHandler(func(delay time.Duration) {
+		close(called)
+	})
+	err := ws.Connect()
+	require.NoError(t, err)
+
+	// assert
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+	case <-called:
+	}
+	assert.NoError(t, ctx.Err())
+}
