@@ -23,11 +23,17 @@ const (
 	receive     eventType = "receive"
 	sendJSON    eventType = "sendJSON"
 	receiveJSON eventType = "receiveJSON"
+	sendPing    eventType = "sendPing"
+	receivePing eventType = "receivePing"
+	sendPong    eventType = "sendPong"
+	receivePong eventType = "receivePong"
+	delay       eventType = "delay"
 )
 
 type event struct {
 	tvpe    eventType
 	message string
+	delay   time.Duration
 }
 
 type WebSocketMock struct {
@@ -139,6 +145,56 @@ func (mock *WebSocketMock) ReceiveJSON(messages ...string) *WebSocketMock {
 	return mock
 }
 
+func (mock *WebSocketMock) SendPing(messages ...string) *WebSocketMock {
+	for _, m := range messages {
+		mock.events = append(mock.events, event{
+			tvpe:    sendPing,
+			message: m,
+		})
+	}
+	return mock
+}
+
+func (mock *WebSocketMock) ReceivePing(messages ...string) *WebSocketMock {
+	for _, m := range messages {
+		mock.events = append(mock.events, event{
+			tvpe:    receivePing,
+			message: m,
+		})
+	}
+	return mock
+}
+
+func (mock *WebSocketMock) SendPong(messages ...string) *WebSocketMock {
+	for _, m := range messages {
+		mock.events = append(mock.events, event{
+			tvpe:    sendPong,
+			message: m,
+		})
+	}
+	return mock
+}
+
+func (mock *WebSocketMock) ReceivePong(messages ...string) *WebSocketMock {
+	for _, m := range messages {
+		mock.events = append(mock.events, event{
+			tvpe:    receivePong,
+			message: m,
+		})
+	}
+	return mock
+}
+
+func (mock *WebSocketMock) Delay(delays ...time.Duration) *WebSocketMock {
+	for _, d := range delays {
+		mock.events = append(mock.events, event{
+			tvpe:  delay,
+			delay: d,
+		})
+	}
+	return mock
+}
+
 func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 	defer close(mock.done)
 	{
@@ -163,6 +219,36 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 	defer c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "See you!"))
 
+	pings := make(chan string, 1)
+	defer close(pings)
+	c.SetPingHandler(func(message string) error {
+		pings <- message
+		return nil
+	})
+
+	pongs := make(chan string, 1)
+	defer close(pongs)
+	c.SetPongHandler(func(message string) error {
+		pongs <- message
+		return nil
+	})
+
+	reads := make(chan interface{}, 1) // string, or error
+	go func() {
+		for {
+			_, m, err := c.ReadMessage()
+			if err != nil {
+				if _, ok := err.(*websocket.CloseError); ok {
+					return
+				} else {
+					reads <- fmt.Errorf("Read a message from client with an error: [%v].", err)
+				}
+			} else {
+				reads <- string(m)
+			}
+		}
+	}()
+
 	for _, event := range mock.events {
 		switch event.tvpe {
 		case send:
@@ -184,13 +270,13 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case receive:
-			_, m, err := c.ReadMessage()
-			if err != nil {
+			m := <-reads
+			if err, ok := m.(error); ok {
 				mock.assertErr = append(mock.assertErr, fmt.Errorf("Read a message from client with an error: [%v].", err))
 				return
 			}
-			if string(m) != event.message {
-				mock.assertErr = append(mock.assertErr, fmt.Errorf("Expect get [%v] but [%v]", event.message, string(m)))
+			if m != event.message {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Expect get [%v] but [%v]", event.message, m))
 				return
 			}
 		case receiveJSON:
@@ -200,21 +286,77 @@ func (mock *WebSocketMock) handler(w http.ResponseWriter, r *http.Request) {
 				mock.assertErr = append(mock.assertErr, fmt.Errorf("Decode message [%v] to json failed with an error: [%v].", event.message, err))
 				return
 			}
-			var actual interface{}
-			err = c.ReadJSON(&actual)
-			if err != nil {
-				mock.assertErr = append(mock.assertErr, fmt.Errorf("Read a JSON from client with an error: [%v].", err))
+
+			m := <-reads
+			if err, ok := m.(error); ok {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Read a message from client with an error: [%v].", err))
 				return
 			}
+
+			var actual interface{}
+			err = json.NewDecoder(strings.NewReader(m.(string))).Decode(&actual)
+			if err != nil {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Decode message [%v] to json failed with an error: [%v].", m.(string), err))
+				return
+			}
+
 			if !reflect.DeepEqual(expected, actual) {
 				b, _ := json.Marshal(actual)
 				mock.assertErr = append(mock.assertErr, fmt.Errorf("Expect get JSON [%v] but [%v]", event.message, string(b)))
 				return
 			}
+		case sendPing:
+
+			err := c.WriteMessage(websocket.PingMessage, []byte(event.message))
+			if err != nil {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Send ping [%v] failed with an error: [%v].", event.message, err))
+				return
+			}
+
+		case receivePing:
+
+			m, ok := <-pings
+			if !ok {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Read a ping failed since channel is closed"))
+				return
+			}
+
+			if m != event.message {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Expect get ping [%v] but [%v]", event.message, m))
+				return
+			}
+
+		case sendPong:
+
+			err := c.WriteMessage(websocket.PongMessage, []byte(event.message))
+			if err != nil {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Send pong [%v] failed with an error: [%v].", event.message, err))
+				return
+			}
+
+		case receivePong:
+
+			m, ok := <-pongs
+			if !ok {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Read a pong failed since channel is closed"))
+				return
+			}
+
+			if m != event.message {
+				mock.assertErr = append(mock.assertErr, fmt.Errorf("Expect get pong [%v] but [%v]", event.message, m))
+				return
+			}
+
+		case delay:
+
+			time.Sleep(event.delay)
+
 		default:
 			s := fmt.Sprintf("Unknown tvpe: [%v]", event.tvpe)
 			panic(s)
 		}
 	}
+
+	time.Now()
 
 }

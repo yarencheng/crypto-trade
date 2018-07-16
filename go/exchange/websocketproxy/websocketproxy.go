@@ -15,7 +15,8 @@ import (
 )
 
 type Config struct {
-	URL url.URL
+	URL          url.URL
+	PingInterval time.Duration
 }
 
 var Default Config = Config{
@@ -23,6 +24,7 @@ var Default Config = Config{
 		Scheme: "wss",
 		Host:   "...example.com",
 	},
+	PingInterval: 5 * time.Second,
 }
 
 type command string
@@ -217,17 +219,17 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
+			logger.Infof("Connection to [%v] is established.", this.config.URL.String())
+			this.conn = conn
+			this.state = connected
+			e.callback(nil)
+
 			this.pingStop = make(chan int, 1)
 			this.pingWg.Add(1)
 			go func() {
 				defer this.pingWg.Done()
 				this.pingWorker()
 			}()
-
-			logger.Infof("Connection to [%v] is established.", this.config.URL.String())
-			this.conn = conn
-			this.state = connected
-			e.callback(nil)
 
 			this.connectedFnLock.Lock()
 			if this.connectedFn != nil {
@@ -312,11 +314,11 @@ func (this *WebSocketProxy) pingWorker() {
 			logger.Debugf("Receives a pong in [%v] seconds", end.Sub(start).Seconds())
 
 			delay := end.Sub(start)
-			if delay.Seconds() < 1 {
-				time.Sleep(time.Second - delay)
+			if delay < this.config.PingInterval {
+				time.Sleep(this.config.PingInterval - delay)
 			}
 
-			err := this.conn.WriteMessage(websocket.PingMessage, nil)
+			err := this.conn.WriteMessage(websocket.PingMessage, []byte("ping"))
 
 			if err != nil {
 				logger.Warnf("Send ping message failed. err: [%v]", err)
@@ -326,15 +328,15 @@ func (this *WebSocketProxy) pingWorker() {
 			t = timep()
 			tLock.Unlock()
 
-			go func(o time.Time) {
-				time.Sleep(5 * time.Second)
+			go func() {
+				time.Sleep(2 * this.config.PingInterval)
 
 				tLock.Lock()
 				last := *t
 				tLock.Unlock()
 
-				delay_ := o.Sub(last)
-				if delay_.Seconds() > 5 {
+				delay_ := time.Now().Sub(last)
+				if delay_ > 2*this.config.PingInterval {
 					logger.Warnf("It took too long for a pong in [%v] seconds", delay_.Seconds())
 
 					this.pingFailedFnLock.Lock()
@@ -344,7 +346,7 @@ func (this *WebSocketProxy) pingWorker() {
 						this.pingFailedFn(delay_)
 					}
 				}
-			}(*t)
+			}()
 		}
 	}
 }

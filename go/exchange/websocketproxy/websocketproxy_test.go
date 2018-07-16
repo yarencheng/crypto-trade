@@ -135,10 +135,14 @@ func Test_SetPingFailedHandler(t *testing.T) {
 	// arrange: mock for web socket server
 	wsMock := mocks.NewWebSocketMock()
 	defer wsMock.Close()
+	wsMock.ReceivePing("ping")
+	wsMock.Delay(1 * time.Second)
+	wsMock.SendPong("pong")
 
 	// arrange: web socket proxy
 	ws := New(&Config{
-		URL: *wsMock.URL(),
+		URL:          *wsMock.URL(),
+		PingInterval: time.Millisecond * 100,
 	})
 	defer ws.Stop(context.Background())
 
@@ -151,11 +155,12 @@ func Test_SetPingFailedHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	select {
 	case <-ctx.Done():
+		assert.Fail(t, "timeout")
 	case <-called:
+		// pass
 	}
-	assert.NoError(t, ctx.Err())
 }
