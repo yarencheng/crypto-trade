@@ -9,24 +9,6 @@
 			"revisionTime": "2018-04-25T17:22:59Z"
 		},
 		{
-			"checksumSHA1": "QgcegJpPKjqvR95m55DZqlBhHRc=",
-			"path": "github.com/bitfinexcom/bitfinex-api-go/utils",
-			"revision": "9b18c5efaf6cc6d456af58163bbe3927e3f0fbd8",
-			"revisionTime": "2018-04-25T17:22:59Z"
-		},
-		{
-			"checksumSHA1": "x7LzVhhM/FT1WlbhU3ga+OXgFBI=",
-			"path": "github.com/bitfinexcom/bitfinex-api-go/v2",
-			"revision": "9b18c5efaf6cc6d456af58163bbe3927e3f0fbd8",
-			"revisionTime": "2018-04-25T17:22:59Z"
-		},
-		{
-			"checksumSHA1": "Tb8l0EJaiqnwjRDApVjeNjFCf/E=",
-			"path": "github.com/bitfinexcom/bitfinex-api-go/v2/websocket",
-			"revision": "9b18c5efaf6cc6d456af58163bbe3927e3f0fbd8",
-			"revisionTime": "2018-04-25T17:22:59Z"
-		},
-		{
 			"checksumSHA1": "CSPbwbyzqA6sfORicn4HFtIhF/c=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "8991bc29aa16c548c550c7ff78260e27b9ab7c73",
@@ -157,12 +139,6 @@
 			"versionExact": "v1.0.5"
 		},
 		{
-			"checksumSHA1": "XHH8+1ESYdBoyKSD4FXwdy1liUk=",
-			"path": "github.com/stretchr/objx",
-			"revision": "b8b73a35e9830ae509858c10dec5866b4d5c8bff",
-			"revisionTime": "2018-07-02T10:34:55Z"
-		},
-		{
 			"checksumSHA1": "c6pbpF7eowwO59phRTpF8cQ80Z0=",
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
@@ -171,24 +147,8 @@
 			"versionExact": "v1.2.2"
 		},
 		{
-			"checksumSHA1": "WmBSFdqpdYRIkp0I408JIZ3LDMY=",
-			"path": "github.com/stretchr/testify/mock",
-			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
-			"revisionTime": "2018-05-06T18:05:49Z",
-			"version": "v1",
-			"versionExact": "v1.2.2"
-		},
-		{
 			"checksumSHA1": "wnEANt4k5X/KGwoFyfSSnpxULm4=",
 			"path": "github.com/stretchr/testify/require",
-			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
-			"revisionTime": "2018-05-06T18:05:49Z",
-			"version": "v1",
-			"versionExact": "v1.2.2"
-		},
-		{
-			"checksumSHA1": "uefllr2OtKBGo/kQSAPbW3w6p0A=",
-			"path": "github.com/stretchr/testify/suite",
 			"revision": "f35b8ab0b5a2cef36673838d662e249dd9c94686",
 			"revisionTime": "2018-05-06T18:05:49Z",
 			"version": "v1",
