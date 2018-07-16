@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/gorilla/websocket"
 	"github.com/imdario/mergo"
 	"github.com/yarencheng/crypto-trade/go/logger"
@@ -70,11 +72,13 @@ func (e *Error) Error() string {
 }
 
 type WebSocketProxy struct {
-	config Config
-	stopWg sync.WaitGroup
-	state  state
-	conn   *websocket.Conn
-	events chan *event
+	config          Config
+	stopWg          sync.WaitGroup
+	state           state
+	conn            *websocket.Conn
+	events          chan *event
+	connectedFn     func(in <-chan *gjson.Result, out chan<- *gjson.Result)
+	connectedFnLock sync.Mutex
 }
 
 func New(c *Config) *WebSocketProxy {
@@ -167,15 +171,13 @@ func (this *WebSocketProxy) Disconnect() error {
 	return err
 }
 
-func (this *WebSocketProxy) worker() {
+func (this *WebSocketProxy) SetConnectedHandler(fn func(in <-chan *gjson.Result, out chan<- *gjson.Result)) {
+	this.connectedFnLock.Lock()
+	defer this.connectedFnLock.Unlock()
+	this.connectedFn = fn
+}
 
-	defer func() {
-		if this.conn != nil {
-			logger.Debugf("Connection is closing")
-			this.conn.Close()
-			logger.Debugf("Connection closed")
-		}
-	}()
+func (this *WebSocketProxy) worker() {
 
 	for {
 		e, ok := <-this.events
@@ -193,8 +195,8 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
-			this.state = connecting
 			logger.Infof("Create connection to [%v].", this.config.URL.String())
+			this.state = connecting
 
 			conn, _, err := websocket.DefaultDialer.Dial(this.config.URL.String(), nil)
 			if err != nil {
@@ -204,10 +206,16 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
-			this.conn = conn
 			logger.Infof("Connection to [%v] is established.", this.config.URL.String())
+			this.conn = conn
 			this.state = connected
 			e.callback(nil)
+
+			this.connectedFnLock.Lock()
+			if this.connectedFn != nil {
+				this.connectedFn(nil, nil)
+			}
+			this.connectedFnLock.Unlock()
 
 		case disconnect:
 			if this.state != connected {
@@ -217,8 +225,8 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
-			this.state = disconnecting
 			logger.Infof("Connection is closing")
+			this.state = disconnecting
 
 			err := this.conn.Close()
 			if err != nil {
@@ -228,9 +236,8 @@ func (this *WebSocketProxy) worker() {
 				continue
 			}
 
-			this.conn = nil
-
 			logger.Infof("Connection closed")
+			this.conn = nil
 			this.state = disconnected
 			e.callback(nil)
 

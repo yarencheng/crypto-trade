@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 
 	"github.com/stretchr/testify/assert"
 
@@ -94,4 +96,35 @@ func Test_Disconnect_InvalideStateError(t *testing.T) {
 	// assert
 	assert.Error(t, err)
 	assert.EqualValues(t, InvalideStateError, err.(*Error).Type)
+}
+
+func Test_SetConnectedHandler(t *testing.T) {
+	t.Parallel()
+
+	// arrange: mock for web socket server
+	wsMock := mocks.NewWebSocketMock()
+	defer wsMock.Close()
+
+	// arrange: web socket proxy
+	ws := New(&Config{
+		URL: *wsMock.URL(),
+	})
+	defer ws.Stop(context.Background())
+
+	// action
+	called := make(chan int, 1)
+	ws.SetConnectedHandler(func(in <-chan *gjson.Result, out chan<- *gjson.Result) {
+		close(called)
+	})
+	err := ws.Connect()
+	require.NoError(t, err)
+
+	// assert
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+	case <-called:
+	}
+	assert.NoError(t, ctx.Err())
 }
