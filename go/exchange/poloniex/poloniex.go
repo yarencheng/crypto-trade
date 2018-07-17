@@ -65,6 +65,8 @@ func (p *Poloniex) Start() error {
 		p.subChannels = append(p.subChannels, id.(string))
 	}
 
+	p.ws.
+
 	err := p.ws.Connect()
 	if err != nil {
 		err = fmt.Errorf("Start websocket failed. err: [%v]", err)

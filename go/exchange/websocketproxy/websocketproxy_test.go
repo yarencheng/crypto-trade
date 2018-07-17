@@ -208,3 +208,36 @@ func Test_SetPingFailedHandler(t *testing.T) {
 	}
 	wsMock.Assert(t)
 }
+
+func Test_SetDisconnectedHandler(t *testing.T) {
+	t.Parallel()
+
+	// arrange: mock for web socket server
+	wsMock := mocks.NewWebSocketMock()
+	defer wsMock.Close()
+
+	// arrange: web socket proxy
+	ws := New(&Config{
+		URL: *wsMock.URL(),
+	})
+	defer ws.Stop(context.Background())
+
+	// action
+	called := make(chan int, 1)
+	ws.SetDisconnectedHandler(func(int, string) {
+		close(called)
+	})
+	err := ws.Connect()
+	require.NoError(t, err)
+
+	// assert
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		assert.Fail(t, "timeout")
+	case <-called:
+		// pass
+	}
+	wsMock.Assert(t)
+}

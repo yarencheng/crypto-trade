@@ -78,21 +78,23 @@ func (e *Error) Error() string {
 }
 
 type WebSocketProxy struct {
-	config           Config
-	readStop         chan int
-	readWg           sync.WaitGroup
-	pingStop         chan int
-	pingWg           sync.WaitGroup
-	workerWg         sync.WaitGroup
-	state            state
-	conn             *websocket.Conn
-	events           chan *event
-	in               chan *gjson.Result
-	out              chan *gjson.Result
-	connectedFn      func(in <-chan *gjson.Result, out chan<- *gjson.Result)
-	connectedFnLock  sync.Mutex
-	pingFailedFn     func(delay time.Duration)
-	pingFailedFnLock sync.Mutex
+	config             Config
+	readStop           chan int
+	readWg             sync.WaitGroup
+	pingStop           chan int
+	pingWg             sync.WaitGroup
+	workerWg           sync.WaitGroup
+	state              state
+	conn               *websocket.Conn
+	events             chan *event
+	in                 chan *gjson.Result
+	out                chan *gjson.Result
+	connectedFn        func(in <-chan *gjson.Result, out chan<- *gjson.Result)
+	connectedFnLock    sync.Mutex
+	disconnectedFn     func(code int, message string)
+	disconnectedFnLock sync.Mutex
+	pingFailedFn       func(delay time.Duration)
+	pingFailedFnLock   sync.Mutex
 }
 
 func New(c *Config) *WebSocketProxy {
@@ -195,6 +197,12 @@ func (this *WebSocketProxy) SetPingFailedHandler(fn func(delay time.Duration)) {
 	this.pingFailedFnLock.Lock()
 	defer this.pingFailedFnLock.Unlock()
 	this.pingFailedFn = fn
+}
+
+func (this *WebSocketProxy) SetDisconnectedHandler(fn func(code int, message string)) {
+	this.disconnectedFnLock.Lock()
+	defer this.disconnectedFnLock.Unlock()
+	this.disconnectedFn = fn
 }
 
 func (this *WebSocketProxy) worker() {
@@ -379,6 +387,13 @@ func (this *WebSocketProxy) readWorker() {
 					default:
 						logger.Warnf("Remote server is closed(code=%v) with message [%v].", we.Code, we.Text)
 					}
+
+					this.disconnectedFnLock.Lock()
+					defer this.disconnectedFnLock.Unlock()
+					if this.disconnectedFn != nil {
+						this.disconnectedFn(we.Code, we.Text)
+					}
+
 				} else {
 					logger.Warnf("Read JSON failed. err: [%v].", err)
 				}
