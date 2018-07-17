@@ -92,7 +92,7 @@ type WebSocketProxy struct {
 	out                chan *gjson.Result
 	connectedFn        func(in <-chan *gjson.Result, out chan<- *gjson.Result)
 	connectedFnLock    sync.Mutex
-	disconnectedFn     func(code int, message string)
+	disconnectedFn     func()
 	disconnectedFnLock sync.Mutex
 	pingTooLongFn      func(delay time.Duration)
 	pingTooLongFnLock  sync.Mutex
@@ -202,7 +202,7 @@ func (this *WebSocketProxy) SetPingTooLongFnHandler(fn func(delay time.Duration)
 	this.pingTooLongFn = fn
 }
 
-func (this *WebSocketProxy) SetDisconnectedHandler(fn func(code int, message string)) {
+func (this *WebSocketProxy) SetDisconnectedHandler(fn func()) {
 	this.disconnectedFnLock.Lock()
 	defer this.disconnectedFnLock.Unlock()
 	this.disconnectedFn = fn
@@ -304,9 +304,7 @@ func (this *WebSocketProxy) worker() {
 
 			this.disconnectedFnLock.Lock()
 			if this.disconnectedFn != nil {
-				code := (<-e.ins).(int)
-				text := (<-e.ins).(string)
-				this.disconnectedFn(code, text)
+				this.disconnectedFn()
 			}
 			this.disconnectedFnLock.Unlock()
 
@@ -424,14 +422,8 @@ func (this *WebSocketProxy) readWorker() {
 						logger.Warnf("Remote server is closed(code=%v) with message [%v].", we.Code, we.Text)
 					}
 
-					in := make(chan interface{}, 2)
-					in <- we.Code
-					in <- we.Text
-					close(in)
-
 					this.events <- &event{
 						command: disconnect,
-						ins:     in,
 						outs:    make(chan interface{}, 1),
 					}
 

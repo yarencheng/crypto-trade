@@ -73,7 +73,15 @@ func (this *Poloniex) Start() error {
 	this.ws.SetDisconnectedHandler(this.OnDisconnected)
 	this.ws.SetPingTooLongFnHandler(func(delay time.Duration) {
 		logger.Error("TODO Ping error")
-		go this.ws.Disconnect()
+		go func() {
+			this.ws.Disconnect()
+			for {
+				logger.Error("TODO reconnect")
+				if nil == this.ws.Connect() {
+					break
+				}
+			}
+		}()
 	})
 
 	err := this.ws.Connect()
@@ -148,8 +156,8 @@ func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 	logger.Infof("Reader is started")
 }
 
-func (this *Poloniex) OnDisconnected(code int, message string) {
-	logger.Infof("Web socket disconnected. code=[%v] message=[%v]", code, message)
+func (this *Poloniex) OnDisconnected() {
+	logger.Infof("Web socket disconnected.")
 
 	close(this.readStop)
 	this.readStopWg.Wait()
