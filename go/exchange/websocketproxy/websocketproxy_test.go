@@ -172,7 +172,7 @@ func Test_SetConnectedHandler_checkIncomingMessage(t *testing.T) {
 	wsMock.Assert(t)
 }
 
-func Test_SetPingFailedHandler(t *testing.T) {
+func Test_SetPingTooLongFnHandler(t *testing.T) {
 	t.Parallel()
 
 	// arrange: mock for web socket server
@@ -191,7 +191,7 @@ func Test_SetPingFailedHandler(t *testing.T) {
 
 	// action
 	called := make(chan int, 1)
-	ws.SetPingFailedHandler(func(delay time.Duration) {
+	ws.SetPingTooLongFnHandler(func(delay time.Duration) {
 		close(called)
 	})
 	err := ws.Connect()

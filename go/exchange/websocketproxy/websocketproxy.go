@@ -33,18 +33,20 @@ var Default Config = Config{
 type command string
 
 const (
-	connect    command = "connect"
-	disconnect command = "disconnect"
+	connect     command = "connect"
+	disconnect  command = "disconnect"
+	pingTooLong command = "pingTooLong"
 )
 
 type event struct {
-	command    command
-	callbackFn func(err error)
+	command command
+	ins     <-chan interface{}
+	outs    chan<- interface{}
 }
 
-func (e *event) callback(err error) {
-	if e.callbackFn != nil {
-		e.callbackFn(err)
+func (this *event) out(vs ...interface{}) {
+	for _, v := range vs {
+		this.outs <- v
 	}
 }
 
@@ -93,8 +95,8 @@ type WebSocketProxy struct {
 	connectedFnLock    sync.Mutex
 	disconnectedFn     func(code int, message string)
 	disconnectedFnLock sync.Mutex
-	pingFailedFn       func(delay time.Duration)
-	pingFailedFnLock   sync.Mutex
+	pingTooLongFn      func(delay time.Duration)
+	pingTooLongFnLock  sync.Mutex
 }
 
 func New(c *Config) *WebSocketProxy {
@@ -153,38 +155,38 @@ func (this *WebSocketProxy) Stop(ctx context.Context) error {
 
 func (this *WebSocketProxy) Connect() error {
 
-	c := make(chan error, 1)
-
-	fn := func(e error) {
-		c <- e
-	}
+	r := make(chan interface{}, 1)
 
 	this.events <- &event{
-		command:    connect,
-		callbackFn: fn,
+		command: connect,
+		outs:    r,
 	}
 
-	err := <-c
+	err := <-r
 
-	return err
+	if err != nil {
+		return err.(error)
+	}
+
+	return nil
 }
 
 func (this *WebSocketProxy) Disconnect() error {
 
-	c := make(chan error, 1)
-
-	fn := func(e error) {
-		c <- e
-	}
+	r := make(chan interface{}, 1)
 
 	this.events <- &event{
-		command:    disconnect,
-		callbackFn: fn,
+		command: disconnect,
+		outs:    r,
 	}
 
-	err := <-c
+	err := <-r
 
-	return err
+	if err != nil {
+		return err.(error)
+	}
+
+	return nil
 }
 
 func (this *WebSocketProxy) SetConnectedHandler(fn func(in <-chan *gjson.Result, out chan<- *gjson.Result)) {
@@ -193,10 +195,10 @@ func (this *WebSocketProxy) SetConnectedHandler(fn func(in <-chan *gjson.Result,
 	this.connectedFn = fn
 }
 
-func (this *WebSocketProxy) SetPingFailedHandler(fn func(delay time.Duration)) {
-	this.pingFailedFnLock.Lock()
-	defer this.pingFailedFnLock.Unlock()
-	this.pingFailedFn = fn
+func (this *WebSocketProxy) SetPingTooLongFnHandler(fn func(delay time.Duration)) {
+	this.pingTooLongFnLock.Lock()
+	defer this.pingTooLongFnLock.Unlock()
+	this.pingTooLongFn = fn
 }
 
 func (this *WebSocketProxy) SetDisconnectedHandler(fn func(code int, message string)) {
@@ -219,7 +221,7 @@ func (this *WebSocketProxy) worker() {
 			if this.state != disconnected {
 				err := fmt.Errorf("Web socket allready connected")
 				logger.Warnf("%v.", err)
-				e.callback(newError(InvalideStateError, err))
+				e.out(newError(InvalideStateError, err))
 				continue
 			}
 
@@ -229,7 +231,7 @@ func (this *WebSocketProxy) worker() {
 			conn, _, err := websocket.DefaultDialer.Dial(this.config.URL.String(), nil)
 			if err != nil {
 				logger.Warnf("Connect to [%v] failed. err: [%v]", this.config.URL.String(), err)
-				e.callback(newError(ConnectionError, err))
+				e.out(newError(ConnectionError, err))
 				this.state = disconnected
 				continue
 			}
@@ -237,7 +239,7 @@ func (this *WebSocketProxy) worker() {
 			logger.Infof("Connection to [%v] is established.", this.config.URL.String())
 			this.conn = conn
 			this.state = connected
-			e.callback(nil)
+			e.out(nil)
 
 			this.pingStop = make(chan int, 1)
 			this.pingWg.Add(1)
@@ -265,7 +267,7 @@ func (this *WebSocketProxy) worker() {
 			if this.state != connected {
 				err := fmt.Errorf("Web socket dose not connected")
 				logger.Warnf("%v.", err)
-				e.callback(newError(InvalideStateError, err))
+				e.out(newError(InvalideStateError, err))
 				continue
 			}
 
@@ -280,7 +282,7 @@ func (this *WebSocketProxy) worker() {
 			err := this.conn.Close()
 			if err != nil {
 				logger.Warnf("Disconnect to [%v] failed. err: [%v]", this.config.URL.String(), err)
-				e.callback(newError(ConnectionError, err))
+				e.out(newError(ConnectionError, err))
 				this.state = disconnected
 				continue
 			}
@@ -288,7 +290,16 @@ func (this *WebSocketProxy) worker() {
 			logger.Infof("Connection closed")
 			this.conn = nil
 			this.state = disconnected
-			e.callback(nil)
+			e.out(nil)
+
+		case pingTooLong:
+
+			this.pingTooLongFnLock.Lock()
+			if this.pingTooLongFn != nil {
+				delay := (<-e.ins).(time.Duration)
+				this.pingTooLongFn(delay)
+			}
+			this.pingTooLongFnLock.Unlock()
 
 		default:
 		}
@@ -354,11 +365,13 @@ func (this *WebSocketProxy) pingWorker() {
 				if delay_ > 2*this.config.PingInterval {
 					logger.Warnf("It took too long for a pong in [%v] seconds", delay_.Seconds())
 
-					this.pingFailedFnLock.Lock()
-					defer this.pingFailedFnLock.Unlock()
+					in := make(chan interface{}, 1)
+					in <- delay_
+					close(in)
 
-					if this.pingFailedFn != nil {
-						this.pingFailedFn(delay_)
+					this.events <- &event{
+						command: pingTooLong,
+						ins:     in,
 					}
 				}
 			}()
