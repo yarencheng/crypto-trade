@@ -33,6 +33,7 @@ var Default Config = Config{
 type command string
 
 const (
+	stop        command = "stop"
 	connect     command = "connect"
 	disconnect  command = "disconnect"
 	pingTooLong command = "pingTooLong"
@@ -81,10 +82,8 @@ func (e *Error) Error() string {
 
 type WebSocketProxy struct {
 	config             Config
-	readStop           chan int
-	readWg             sync.WaitGroup
-	pingStop           chan int
-	pingWg             sync.WaitGroup
+	stop               chan int
+	wg                 sync.WaitGroup
 	workerWg           sync.WaitGroup
 	state              state
 	conn               *websocket.Conn
@@ -129,7 +128,9 @@ func (this *WebSocketProxy) Stop(ctx context.Context) error {
 
 	wait := make(chan int, 1)
 	go func() {
-		close(this.events)
+		this.events <- &event{
+			command: stop,
+		}
 		this.workerWg.Wait()
 		if this.state == connected {
 			err := this.conn.Close()
@@ -212,11 +213,14 @@ func (this *WebSocketProxy) worker() {
 	for {
 		e, ok := <-this.events
 		if !ok {
-			logger.Debugf("Stop worker since event queue is closed.")
+			logger.Errorf("Stop worker since event queue is closed.")
 			return
 		}
 
 		switch e.command {
+		case stop:
+			logger.Debugf("Stop worker since event queue is closed.")
+			return
 		case connect:
 			if this.state != disconnected {
 				err := fmt.Errorf("Web socket allready connected")
@@ -241,25 +245,33 @@ func (this *WebSocketProxy) worker() {
 			this.state = connected
 			e.out(nil)
 
-			this.pingStop = make(chan int, 1)
-			this.pingWg.Add(1)
+			this.stop = make(chan int, 1)
+
+			this.wg.Add(1)
 			go func() {
-				defer this.pingWg.Done()
+				defer this.wg.Done()
 				this.pingWorker()
 			}()
 
-			this.readStop = make(chan int, 1)
-			this.readWg.Add(1)
+			this.wg.Add(1)
 			this.in = make(chan *gjson.Result, this.config.BufferSize)
 			go func() {
-				defer this.readWg.Done()
-
+				defer this.wg.Done()
 				this.readWorker()
+			}()
+
+			this.wg.Add(1)
+			this.out = make(chan *gjson.Result, this.config.BufferSize)
+			go func() {
+				defer this.wg.Done()
+				this.writeWorker()
 			}()
 
 			this.connectedFnLock.Lock()
 			if this.connectedFn != nil {
-				this.connectedFn(this.in, nil)
+				this.connectedFn(this.in, this.out)
+			} else {
+				logger.Warnf("Connected handler is not set.")
 			}
 			this.connectedFnLock.Unlock()
 
@@ -274,10 +286,8 @@ func (this *WebSocketProxy) worker() {
 			logger.Infof("Connection is closing")
 			this.state = disconnecting
 
-			close(this.pingStop)
-			close(this.readStop)
-			this.pingWg.Wait()
-			this.readWg.Wait()
+			close(this.stop)
+			this.wg.Wait()
 
 			err := this.conn.Close()
 			if err != nil {
@@ -292,18 +302,30 @@ func (this *WebSocketProxy) worker() {
 			this.state = disconnected
 			e.out(nil)
 
+			this.disconnectedFnLock.Lock()
+			if this.disconnectedFn != nil {
+				code := (<-e.ins).(int)
+				text := (<-e.ins).(string)
+				this.disconnectedFn(code, text)
+			}
+			this.disconnectedFnLock.Unlock()
+
 		case pingTooLong:
 
 			this.pingTooLongFnLock.Lock()
 			if this.pingTooLongFn != nil {
 				delay := (<-e.ins).(time.Duration)
 				this.pingTooLongFn(delay)
+			} else {
+				logger.Warnf("PingTooLong handler is not set.")
 			}
 			this.pingTooLongFnLock.Unlock()
 
 		default:
 		}
 	}
+
+	time.Sleep(1) //debug
 }
 
 func (this *WebSocketProxy) pingWorker() {
@@ -328,7 +350,7 @@ func (this *WebSocketProxy) pingWorker() {
 
 	for {
 		select {
-		case <-this.pingStop:
+		case <-this.stop:
 			return
 		case <-received:
 
@@ -372,6 +394,7 @@ func (this *WebSocketProxy) pingWorker() {
 					this.events <- &event{
 						command: pingTooLong,
 						ins:     in,
+						outs:    make(chan interface{}, 1),
 					}
 				}
 			}()
@@ -401,10 +424,15 @@ func (this *WebSocketProxy) readWorker() {
 						logger.Warnf("Remote server is closed(code=%v) with message [%v].", we.Code, we.Text)
 					}
 
-					this.disconnectedFnLock.Lock()
-					defer this.disconnectedFnLock.Unlock()
-					if this.disconnectedFn != nil {
-						this.disconnectedFn(we.Code, we.Text)
+					in := make(chan interface{}, 2)
+					in <- we.Code
+					in <- we.Text
+					close(in)
+
+					this.events <- &event{
+						command: disconnect,
+						ins:     in,
+						outs:    make(chan interface{}, 1),
 					}
 
 				} else {
@@ -429,7 +457,35 @@ func (this *WebSocketProxy) readWorker() {
 	}()
 
 	select {
-	case <-this.readStop:
+	case <-this.stop:
+	case <-done:
+	}
+}
+
+func (this *WebSocketProxy) writeWorker() {
+
+	done := make(chan int, 1)
+
+	go func() {
+
+		defer close(this.out)
+		defer close(done)
+
+		for {
+
+			gj := <-this.out
+
+			err := this.conn.WriteMessage(websocket.TextMessage, []byte(gj.String()))
+
+			if err != nil {
+				logger.Warnf("Write JSON [%v] failed. err: [%v].", gj.String(), err)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-this.stop:
 	case <-done:
 	}
 }

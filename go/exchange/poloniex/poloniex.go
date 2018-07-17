@@ -27,6 +27,10 @@ type Poloniex struct {
 	wsSeqenceID map[int64]int64 // key: channel_id, value sequence
 	subChannels []string
 	ws          *websocketproxy.WebSocketProxy
+	wsIn        <-chan *gjson.Result
+	wsOut       chan<- *gjson.Result
+	readStop    chan int
+	readStopWg  sync.WaitGroup
 }
 
 func New() *Poloniex {
@@ -45,12 +49,12 @@ func New() *Poloniex {
 	return b
 }
 
-func (p *Poloniex) Start() error {
+func (this *Poloniex) Start() error {
 	logger.Info("Starting")
 
 	ids := hashset.New()
-	for _, c1 := range p.Currencies {
-		for _, c2 := range p.Currencies {
+	for _, c1 := range this.Currencies {
+		for _, c2 := range this.Currencies {
 			pair := hashset.New()
 			pair.Add(c1, c2)
 			id, ok := pairToChannelID(pair)
@@ -62,12 +66,17 @@ func (p *Poloniex) Start() error {
 	}
 
 	for _, id := range ids.Values() {
-		p.subChannels = append(p.subChannels, id.(string))
+		this.subChannels = append(this.subChannels, id.(string))
 	}
 
-	p.ws.
+	this.ws.SetConnectedHandler(this.OnWsConnected)
+	this.ws.SetDisconnectedHandler(this.OnDisconnected)
+	this.ws.SetPingTooLongFnHandler(func(delay time.Duration) {
+		logger.Error("TODO Ping error")
+		go this.ws.Disconnect()
+	})
 
-	err := p.ws.Connect()
+	err := this.ws.Connect()
 	if err != nil {
 		err = fmt.Errorf("Start websocket failed. err: [%v]", err)
 		logger.Errorf("%v", err)
@@ -108,7 +117,50 @@ func (p *Poloniex) Stop(ctx context.Context) error {
 	}
 }
 
-func (p *Poloniex) OnWsConnect() {
+func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.Result) {
+	logger.Infof("Web socket connected")
+	logger.Infof("Reader is starting")
+
+	this.wsIn = in
+	this.wsOut = out
+
+	this.readStop = make(chan int, 1)
+
+	this.readStopWg.Add(1)
+	go func() {
+		defer this.readStopWg.Done()
+
+		for {
+			select {
+			case <-this.readStop:
+				logger.Infof("Reader exists.")
+			case gj, ok := <-this.wsIn:
+				if ok {
+					logger.Infof("Read: %v", gj.String())
+				} else {
+					logger.Infof("Input channel is closed. Reader exists.")
+					return
+				}
+			}
+		}
+	}()
+
+	logger.Infof("Reader is started")
+}
+
+func (this *Poloniex) OnDisconnected(code int, message string) {
+	logger.Infof("Web socket disconnected. code=[%v] message=[%v]", code, message)
+
+	close(this.readStop)
+	this.readStopWg.Wait()
+
+	this.wsOut = nil
+	this.wsIn = nil
+}
+
+// old ==================
+
+func (p *Poloniex) OnWsConnects() {
 	logger.Infof("Web socket connected")
 	p.OrderBooks <- entity.OrderBookEvent{
 		Exchange: entity.Poloniex,
@@ -132,8 +184,6 @@ func (p *Poloniex) listenWebSocket() error {
 		logger.Warnf("%v", err)
 		return err
 	}
-
-	p.OnWsConnect()
 
 	logger.Infof("Connected to [%v]", url.String())
 
