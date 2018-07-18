@@ -293,9 +293,6 @@ func (this *WebSocketProxy) worker() {
 			err := this.conn.Close()
 			if err != nil {
 				logger.Warnf("Disconnect to [%v] failed. err: [%v]", this.config.URL.String(), err)
-				e.out(newError(ConnectionError, err))
-				this.state = disconnected
-				continue
 			}
 
 			logger.Infof("Connection closed")
