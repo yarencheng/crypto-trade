@@ -224,7 +224,7 @@ func Test_SetDisconnectedHandler(t *testing.T) {
 
 	// action
 	called := make(chan int, 1)
-	ws.SetDisconnectedHandler(func(int, string) {
+	ws.SetDisconnectedHandler(func() {
 		close(called)
 	})
 	err := ws.Connect()

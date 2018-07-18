@@ -17,16 +17,16 @@ pre-build: check
 
 .PHONY: build
 build: pre-build
-	$(GO) build -v ./...
+	$(GO) build -race -v ./...
 
 .PHONY: test
 test: build
 	$(GO) test -v -coverprofile=coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -html=coverage.txt -o coverage.html
+	$(GO) tool cover -race -html=coverage.txt -o coverage.html
 
 .PHONY: install
 install: build
-	$(GO) install -v ./...
+	$(GO) install -race -v ./...
 
 .PHONY: clean
 clean:
