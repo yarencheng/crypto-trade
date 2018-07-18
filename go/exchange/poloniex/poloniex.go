@@ -72,12 +72,20 @@ func (this *Poloniex) Start() error {
 	this.ws.SetConnectedHandler(this.OnWsConnected)
 	this.ws.SetDisconnectedHandler(this.OnDisconnected)
 	this.ws.SetPingTooLongFnHandler(func(delay time.Duration) {
-		logger.Error("TODO Ping error")
+		logger.Warnf("Restart server since ping need [%v] seconds", delay.Seconds())
+		// restart
 		go func() {
-			this.ws.Disconnect()
+			logger.Info()
+			if err := this.ws.Disconnect(); err != nil {
+				logger.Errorf("Disconnect from server failed. err:[%v]", err)
+				return
+			}
+
 			for {
-				logger.Error("TODO reconnect")
-				if nil == this.ws.Connect() {
+				if err := this.ws.Connect(); err != nil {
+					logger.Warnf("Restart websocket failed since [%v]. Sleep 10 seconds and then try again.", err)
+					time.Sleep(10 * time.Second)
+				} else {
 					break
 				}
 			}
