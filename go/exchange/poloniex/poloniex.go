@@ -13,7 +13,6 @@ import (
 
 	"github.com/emirpasic/gods/sets"
 	"github.com/emirpasic/gods/sets/hashset"
-	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
@@ -142,9 +141,34 @@ func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 
 	this.readStop = make(chan int, 1)
 
+	this.OrderBooks <- entity.OrderBookEvent{
+		Exchange: entity.Poloniex,
+		Date:     time.Now(),
+		Type:     entity.ExchangeRestart,
+	}
+
+	for _, id := range this.subChannels {
+		logger.Infof("Subscribe channel [%v]", id)
+
+		jb, err := json.Marshal(map[string]interface{}{
+			"command": "subscribe",
+			"channel": id,
+		})
+		if err != nil {
+			logger.Errorf("Create JSON failed. err: [%v]", err)
+			continue
+		}
+
+		gj := gjson.ParseBytes(jb)
+		this.wsOut <- &gj
+	}
+
 	this.readStopWg.Add(1)
 	go func() {
 		defer this.readStopWg.Done()
+
+		this.wsSeqenceID = make(map[int64]int64)
+		defer func() { this.wsSeqenceID = nil }()
 
 		for {
 			select {
@@ -152,7 +176,8 @@ func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 				logger.Infof("Reader exists.")
 			case gj, ok := <-this.wsIn:
 				if ok {
-					logger.Infof("Read: %v", gj.String())
+					logger.Debugf("Read: %v", gj.String())
+					this.handleWebsockerResponse(gj)
 				} else {
 					logger.Infof("Input channel is closed. Reader exists.")
 					return
@@ -175,93 +200,6 @@ func (this *Poloniex) OnDisconnected() {
 }
 
 // old ==================
-
-func (p *Poloniex) OnWsConnects() {
-	logger.Infof("Web socket connected")
-	p.OrderBooks <- entity.OrderBookEvent{
-		Exchange: entity.Poloniex,
-		Date:     time.Now(),
-		Type:     entity.ExchangeRestart,
-	}
-}
-
-func (p *Poloniex) listenWebSocket() error {
-
-	url := url.URL{
-		Scheme: "wss",
-		Host:   "api2.poloniex.com",
-	}
-
-	logger.Infof("Connecting to [%v]", url.String())
-
-	client, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
-	if err != nil {
-		err = fmt.Errorf("Dial to [%v] failed. err: [%v]", url, err)
-		logger.Warnf("%v", err)
-		return err
-	}
-
-	logger.Infof("Connected to [%v]", url.String())
-
-	p.wsSeqenceID = make(map[int64]int64)
-
-	logger.Infof("Subscribe heart beat")
-
-	for _, id := range p.subChannels {
-		logger.Infof("Subscribe channel [%v]", id)
-		j := "{\"command\":\"subscribe\",\"channel\": \"" + id + "\"}"
-		err = client.WriteMessage(websocket.TextMessage, []byte(j))
-		if err != nil {
-			err = fmt.Errorf("Subscribe channel [%v] failed. err: [%v]", id, err)
-			logger.Warnf("%v", err)
-			return err
-		}
-	}
-
-	stopLoop := make(chan int, 1)
-
-	go func() {
-		defer client.Close()
-		select {
-		case <-p.stop:
-		case <-stopLoop:
-		}
-
-		err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		if err != nil {
-			logger.Warnf("Close web socket client failed. err: [%v]", err)
-		}
-
-		p.wsSeqenceID = nil
-	}()
-
-	for {
-		message := make([]interface{}, 0)
-		err = client.ReadJSON(&message)
-
-		if err != nil {
-			err = fmt.Errorf("Read message failed. err: [%v]", err)
-			logger.Warnf("%v", err)
-			close(stopLoop)
-			return err
-		}
-
-		j, err := json.Marshal(message)
-		if err != nil {
-			return fmt.Errorf("Failed to marshal json [%v]. err: [%v]", j, err)
-		}
-
-		gj := gjson.ParseBytes(j)
-
-		logger.Debugf("message [%v]", gj)
-
-		if err := p.handleWebsockerResponse(&gj); err != nil {
-			return fmt.Errorf("Process message [%v] failed. err: [%v]", message, err)
-		}
-	}
-
-	return nil
-}
 
 func (p *Poloniex) handleWebsockerResponse(gj *gjson.Result) error {
 
