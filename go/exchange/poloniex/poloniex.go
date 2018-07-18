@@ -199,8 +199,6 @@ func (this *Poloniex) OnDisconnected() {
 	this.wsIn = nil
 }
 
-// old ==================
-
 func (p *Poloniex) handleWebsockerResponse(gj *gjson.Result) error {
 
 	if !gj.IsArray() {

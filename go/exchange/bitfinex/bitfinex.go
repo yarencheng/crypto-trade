@@ -10,9 +10,9 @@ import (
 
 	"github.com/emirpasic/gods/sets"
 	"github.com/emirpasic/gods/sets/hashset"
-	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 	"github.com/yarencheng/crypto-trade/go/entity"
+	"github.com/yarencheng/crypto-trade/go/exchange/websocketproxy"
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
@@ -22,8 +22,12 @@ type Bitfinex struct {
 	stop            chan int
 	stopWg          sync.WaitGroup
 	subBookSymbols  *hashset.Set
-	wsClient        *websocket.Conn
+	ws              *websocketproxy.WebSocketProxy
 	channelHandlers map[int64]func(gj *gjson.Result) error
+	wsIn            <-chan *gjson.Result
+	wsOut           chan<- *gjson.Result
+	readStop        chan int
+	readStopWg      sync.WaitGroup
 }
 
 func New() *Bitfinex {
@@ -31,61 +35,85 @@ func New() *Bitfinex {
 		stop:           make(chan int, 1),
 		subBookSymbols: hashset.New(),
 	}
+
+	b.ws = websocketproxy.New(&websocketproxy.Config{
+		URL: url.URL{
+			Scheme: "wss",
+			Host:   "api.bitfinex.com",
+			Path:   "ws/2",
+		},
+	})
+
 	return b
 }
 
-func (b *Bitfinex) Start() error {
+func (this *Bitfinex) Start() error {
 	logger.Info("Starting")
-	defer logger.Info("Started")
 
-	for _, c1 := range b.Currencies {
-		for _, c2 := range b.Currencies {
+	for _, c1 := range this.Currencies {
+		for _, c2 := range this.Currencies {
 			pair := hashset.New()
 			pair.Add(c1, c2)
 			symbol, ok := pairSymbol(pair)
 			if !ok {
 				continue
 			}
-			b.subBookSymbols.Add(symbol)
+			this.subBookSymbols.Add(symbol)
 		}
 	}
 
-	b.stopWg.Add(1)
-	go func() {
-		defer b.stopWg.Done()
-
-		for {
-			logger.Infof("Listening to web socket")
-
-			err := b.listenWebSocket()
-
-			if err != nil {
-				logger.Warnf("Got an error; not restart web socket. err: [%v]", err)
+	this.ws.SetConnectedHandler(this.OnWsConnected)
+	this.ws.SetDisconnectedHandler(this.OnDisconnected)
+	this.ws.SetPingTooLongFnHandler(func(delay time.Duration) {
+		logger.Warnf("Restart server since ping need [%v] seconds", delay.Seconds())
+		// restart
+		go func() {
+			logger.Info()
+			if err := this.ws.Disconnect(); err != nil {
+				logger.Errorf("Disconnect from server failed. err:[%v]", err)
 				return
 			}
 
-			select {
-			case <-b.stop:
-				return
-			default:
-				logger.Infof("Restart web socket")
+			for {
+				if err := this.ws.Connect(); err != nil {
+					logger.Warnf("Restart websocket failed since [%v]. Sleep 10 seconds and then try again.", err)
+					time.Sleep(10 * time.Second)
+				} else {
+					break
+				}
 			}
-		}
+		}()
+	})
 
-	}()
+	err := this.ws.Connect()
+	if err != nil {
+		err = fmt.Errorf("Start websocket failed. err: [%v]", err)
+		logger.Errorf("%v", err)
+		return err
+	}
+
+	logger.Info("Started")
 
 	return nil
 }
 
-func (b *Bitfinex) Stop(ctx context.Context) error {
+func (p *Bitfinex) Stop(ctx context.Context) error {
 	logger.Info("Stopping")
-	defer logger.Info("Stopped")
 
 	wait := make(chan int, 1)
 
+	p.stopWg.Add(1)
 	go func() {
-		close(b.stop)
-		b.stopWg.Wait()
+		defer p.stopWg.Done()
+		err := p.ws.Stop(ctx)
+		if err != nil {
+			logger.Errorf("Stop web socket failed. err: [%v]", err)
+		}
+	}()
+
+	go func() {
+		close(p.stop)
+		p.stopWg.Wait()
 		wait <- 1
 	}()
 
@@ -93,8 +121,81 @@ func (b *Bitfinex) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-wait:
+		logger.Info("Stopped")
 		return nil
 	}
+}
+
+func (this *Bitfinex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.Result) {
+	logger.Infof("Web socket connected")
+	logger.Infof("Reader is starting")
+
+	this.wsIn = in
+	this.wsOut = out
+
+	this.readStop = make(chan int, 1)
+
+	this.OrderBooks <- entity.OrderBookEvent{
+		Exchange: entity.Bitfinex,
+		Date:     time.Now(),
+		Type:     entity.ExchangeRestart,
+	}
+
+	for _, symbol := range this.subBookSymbols.Values() {
+		logger.Infof("Subscribe book channel with symbol [%v]", symbol)
+
+		jb, err := json.Marshal(map[string]interface{}{
+			"event":   "subscribe",
+			"channel": "book",
+			"pair":    symbol.(string),
+			"prec":    "P0",
+			"freq":    "F0",
+		})
+
+		if err != nil {
+			logger.Errorf("Create JSON failed. err: [%v]", err)
+			continue
+		}
+
+		gj := gjson.ParseBytes(jb)
+		this.wsOut <- &gj
+	}
+
+	this.readStopWg.Add(1)
+	go func() {
+		defer this.readStopWg.Done()
+
+		this.channelHandlers = make(map[int64]func(gj *gjson.Result) error)
+
+		defer func() { this.channelHandlers = nil }()
+
+		for {
+			select {
+			case <-this.readStop:
+				logger.Infof("Reader exists.")
+			case gj, ok := <-this.wsIn:
+				if ok {
+					logger.Debugf("Read: %v", gj.String())
+					this.handleWsResponse(gj)
+				} else {
+					logger.Infof("Input channel is closed. Reader exists.")
+					return
+				}
+			}
+		}
+	}()
+
+	logger.Infof("Reader is started")
+}
+
+func (this *Bitfinex) OnDisconnected() {
+	logger.Infof("Web socket disconnected.")
+
+	close(this.readStop)
+	this.readStopWg.Wait()
+
+	this.wsOut = nil
+	this.wsIn = nil
 }
 
 func pairSymbol(pair sets.Set) (string, bool) {
@@ -104,95 +205,6 @@ func pairSymbol(pair sets.Set) (string, bool) {
 	} else {
 		return "", false
 	}
-}
-
-func (b *Bitfinex) listenWebSocket() error {
-
-	url := url.URL{
-		Scheme: "wss",
-		Host:   "api.bitfinex.com",
-		Path:   "ws/2",
-	}
-
-	logger.Infof("Connecting to [%v]", url.String())
-
-	client, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
-	if err != nil {
-		err = fmt.Errorf("Dial to [%v] failed. err: [%v]", url, err)
-		logger.Warnf("%v", err)
-		return err
-	}
-	b.wsClient = client
-
-	b.channelHandlers = make(map[int64]func(gj *gjson.Result) error)
-
-	b.onWebSocketConnected()
-
-	logger.Infof("Connected to [%v]", url.String())
-
-	for _, symbol := range b.subBookSymbols.Values() {
-		logger.Infof("Subscribe book channel with symbol [%v]", symbol)
-
-		err = client.WriteJSON(map[string]interface{}{
-			"event":   "subscribe",
-			"channel": "book",
-			"pair":    symbol.(string),
-			"prec":    "P0",
-			"freq":    "F0",
-		})
-
-		if err != nil {
-			err = fmt.Errorf("Subscribe channel [%v] failed. err: [%v]", symbol, err)
-			logger.Warnf("%v", err)
-			return err
-		}
-	}
-
-	stopLoop := make(chan int, 1)
-
-	go func() {
-		defer client.Close()
-		select {
-		case <-b.stop:
-		case <-stopLoop:
-		}
-
-		err := client.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		if err != nil {
-			logger.Warnf("Close web socket client failed. err: [%v]", err)
-		}
-
-	}()
-
-	for {
-		// message := make(map[string]interface{}, 0)
-		var message interface{}
-
-		err = client.ReadJSON(&message)
-
-		if err != nil {
-			err = fmt.Errorf("Read message failed. err: [%v]", err)
-			logger.Warnf("%v", err)
-			close(stopLoop)
-			return err
-		}
-
-		logger.Debugf("message [%v]", message)
-
-		j, err := json.Marshal(message)
-		if err != nil {
-			return fmt.Errorf("Failed to marshal json [%v]. err: [%v]", j, err)
-		}
-
-		gj := gjson.ParseBytes(j)
-		logger.Debugf("gj [%v]", gj)
-
-		if err := b.handleWsResponse(&gj); err != nil {
-			return fmt.Errorf("Process message [%v] failed. err: [%v]", message, err)
-		}
-	}
-
-	return nil
 }
 
 func (b *Bitfinex) handleWsResponse(gj *gjson.Result) error {
@@ -241,6 +253,7 @@ func (b *Bitfinex) handleWsResponseObject(gj *gjson.Result) error {
 		logger.Infof("subscribed pair [%v] at channel [%v]", pair, chanId)
 
 		b.channelHandlers[chanId] = func(gj *gjson.Result) error {
+			// TODO input pair
 			if e := gj.Get("1"); e.IsArray() {
 				return b.handleOrderBookSnapshot(pair, gj)
 			} else {
@@ -279,12 +292,4 @@ func (b *Bitfinex) handleOrderBookSnapshot(pair string, gj *gjson.Result) error 
 func (b *Bitfinex) handleOrderBookUpdate(pair string, gj *gjson.Result) error {
 
 	return nil
-}
-
-func (b *Bitfinex) onWebSocketConnected() {
-	b.OrderBooks <- entity.OrderBookEvent{
-		Exchange: entity.Poloniex,
-		Date:     time.Now(),
-		Type:     entity.ExchangeRestart,
-	}
 }
