@@ -87,6 +87,7 @@ type WebSocketProxy struct {
 	workerWg           sync.WaitGroup
 	state              state
 	conn               *websocket.Conn
+	connWriteLock      sync.Mutex
 	events             chan *event
 	in                 chan *gjson.Result
 	out                chan *gjson.Result
@@ -364,7 +365,9 @@ func (this *WebSocketProxy) pingWorker() {
 				time.Sleep(this.config.PingInterval - delay)
 			}
 
+			this.connWriteLock.Lock()
 			err := this.conn.WriteMessage(websocket.PingMessage, []byte("ping"))
+			this.connWriteLock.Unlock()
 
 			if err != nil {
 				logger.Warnf("Send ping message failed. err: [%v]", err)
@@ -467,7 +470,9 @@ func (this *WebSocketProxy) writeWorker() {
 
 			gj := <-this.out
 
+			this.connWriteLock.Lock()
 			err := this.conn.WriteMessage(websocket.TextMessage, []byte(gj.String()))
+			this.connWriteLock.Unlock()
 
 			if err != nil {
 				logger.Warnf("Write JSON [%v] failed. err: [%v].", gj.String(), err)

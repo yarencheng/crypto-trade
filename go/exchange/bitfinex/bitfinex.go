@@ -291,5 +291,7 @@ func (b *Bitfinex) handleOrderBookSnapshot(pair string, gj *gjson.Result) error 
 
 func (b *Bitfinex) handleOrderBookUpdate(pair string, gj *gjson.Result) error {
 
+	logger.Errorf("aaaaaa handleOrderBookUpdate() pair=%v gj=%v", pair, gj.String())
+
 	return nil
 }
