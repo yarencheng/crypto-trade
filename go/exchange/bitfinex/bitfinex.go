@@ -17,17 +17,17 @@ import (
 )
 
 type Bitfinex struct {
-	Currencies      []entity.Currency
-	OrderBooks      chan<- entity.OrderBookEvent
-	stop            chan int
-	stopWg          sync.WaitGroup
-	subBookSymbols  *hashset.Set
-	ws              *websocketproxy.WebSocketProxy
-	channelHandlers map[int64]func(gj *gjson.Result) error
-	wsIn            <-chan *gjson.Result
-	wsOut           chan<- *gjson.Result
-	readStop        chan int
-	readStopWg      sync.WaitGroup
+	Currencies         []entity.Currency
+	OrderBooks         chan<- entity.OrderBookEvent
+	stop               chan int
+	stopWg             sync.WaitGroup
+	subBookSymbols     *hashset.Set
+	ws                 *websocketproxy.WebSocketProxy
+	channelBookSymbols map[int64]string
+	wsIn               <-chan *gjson.Result
+	wsOut              chan<- *gjson.Result
+	readStop           chan int
+	readStopWg         sync.WaitGroup
 }
 
 func New() *Bitfinex {
@@ -165,9 +165,8 @@ func (this *Bitfinex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 	go func() {
 		defer this.readStopWg.Done()
 
-		this.channelHandlers = make(map[int64]func(gj *gjson.Result) error)
-
-		defer func() { this.channelHandlers = nil }()
+		this.channelBookSymbols = make(map[int64]string)
+		defer func() { this.channelBookSymbols = nil }()
 
 		for {
 			select {
@@ -176,7 +175,10 @@ func (this *Bitfinex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 			case gj, ok := <-this.wsIn:
 				if ok {
 					logger.Debugf("Read: %v", gj.String())
-					this.handleWsResponse(gj)
+					if err := this.handleWsResponse(gj); err != nil {
+						logger.Errorf("Handle responce failed. err: [%v]", err)
+						return
+					}
 				} else {
 					logger.Infof("Input channel is closed. Reader exists.")
 					return
@@ -218,7 +220,7 @@ func (b *Bitfinex) handleWsResponse(gj *gjson.Result) error {
 	}
 }
 
-func (b *Bitfinex) handleWsResponseObject(gj *gjson.Result) error {
+func (this *Bitfinex) handleWsResponseObject(gj *gjson.Result) error {
 
 	var event string
 	if e := gj.Get("event"); !e.Exists() {
@@ -252,15 +254,7 @@ func (b *Bitfinex) handleWsResponseObject(gj *gjson.Result) error {
 
 		logger.Infof("subscribed pair [%v] at channel [%v]", pair, chanId)
 
-		b.channelHandlers[chanId] = func(gj *gjson.Result) error {
-			// TODO input pair
-			if e := gj.Get("1"); e.IsArray() {
-				return b.handleOrderBookSnapshot(pair, gj)
-			} else {
-				return b.handleOrderBookUpdate(pair, gj)
-			}
-
-		}
+		this.channelBookSymbols[chanId] = pair
 	default:
 		return fmt.Errorf("Unknown event: [%v]", event)
 	}
@@ -268,7 +262,7 @@ func (b *Bitfinex) handleWsResponseObject(gj *gjson.Result) error {
 	return nil
 }
 
-func (b *Bitfinex) handleWsResponseArray(gj *gjson.Result) error {
+func (this *Bitfinex) handleWsResponseArray(gj *gjson.Result) error {
 
 	var chanID int64
 	if e := gj.Get("0"); e.Exists() {
@@ -277,21 +271,86 @@ func (b *Bitfinex) handleWsResponseArray(gj *gjson.Result) error {
 		return fmt.Errorf("array is empty")
 	}
 
-	if fn, ok := b.channelHandlers[chanID]; ok {
-		return fn(gj)
+	if symbol, ok := this.channelBookSymbols[chanID]; ok {
+		return this.handleOrderBook(symbol, gj)
 	} else {
-		return fmt.Errorf("No handler for channel [%v]", chanID)
+		return fmt.Errorf("No symbol for channel [%v]", chanID)
 	}
 }
 
-func (b *Bitfinex) handleOrderBookSnapshot(pair string, gj *gjson.Result) error {
+func (this *Bitfinex) handleOrderBook(pair string, gj *gjson.Result) error {
+
+	data := gj.Get("1")
+	if data.IsArray() {
+
+	} else if data.String() == "hb" {
+		logger.Debugf("[%v] heart beat", pair)
+		return nil
+	} else {
+		return fmt.Errorf("Unknown data [%v]", data.String())
+	}
+
+	if data.Get("0").IsArray() {
+		for _, e := range data.Array() {
+			if err := this.handleOrderBookUpdate(pair, &e); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := this.handleOrderBookUpdate(pair, &data); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
 func (b *Bitfinex) handleOrderBookUpdate(pair string, gj *gjson.Result) error {
 
-	logger.Errorf("aaaaaa handleOrderBookUpdate() pair=%v gj=%v", pair, gj.String())
+	c1, c2, err := getCurrencies(pair)
+	if err != nil {
+		return err
+	}
+
+	price := gj.Get("0").Float()
+	count := gj.Get("1").Float()
+	amount := gj.Get("2").Float()
+
+	var order *entity.OrderBookEvent
+	if amount > 0 {
+		order = &entity.OrderBookEvent{
+			Type:     entity.Update,
+			Exchange: entity.Bitfinex,
+			Date:     time.Now(),
+			From:     c2,
+			To:       c1,
+			Price:    price,
+			Volume:   amount * count,
+		}
+	} else {
+		order = &entity.OrderBookEvent{
+			Type:     entity.Update,
+			Exchange: entity.Bitfinex,
+			Date:     time.Now(),
+			From:     c1,
+			To:       c2,
+			Price:    1 / price,
+			Volume:   -amount * count,
+		}
+	}
+
+	logger.Debugf("Receive order [%#v]", order)
+
+	b.OrderBooks <- *order
 
 	return nil
+}
+
+func getCurrencies(symbol string) (entity.Currency, entity.Currency, error) {
+	switch symbol {
+	case "ETHBTC":
+		return entity.ETH, entity.BTC, nil
+	default:
+		return "", "", fmt.Errorf("Unknown symbol [%v]", symbol)
+	}
 }

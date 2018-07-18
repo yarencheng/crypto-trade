@@ -177,7 +177,10 @@ func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 			case gj, ok := <-this.wsIn:
 				if ok {
 					logger.Debugf("Read: %v", gj.String())
-					this.handleWebsockerResponse(gj)
+					if err := this.handleWebsockerResponse(gj); err != nil {
+						logger.Errorf("Handle responce failed. err: [%v]", err)
+						return
+					}
 				} else {
 					logger.Infof("Input channel is closed. Reader exists.")
 					return
@@ -365,7 +368,7 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 			}
 		}
 
-		logger.Debugf("Receive order [%v]", order)
+		logger.Debugf("Receive order [%#v]", order)
 
 		p.OrderBooks <- *order
 	}
