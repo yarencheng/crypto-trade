@@ -21,8 +21,8 @@ build: pre-build
 
 .PHONY: test
 test: build
-	$(GO) test -v -coverprofile=coverage.txt -covermode=atomic ./...
-	$(GO) tool cover -race -html=coverage.txt -o coverage.html
+	$(GO) test -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+	$(GO) tool cover -html=coverage.txt -o coverage.html
 
 .PHONY: install
 install: build
