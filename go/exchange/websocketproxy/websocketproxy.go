@@ -325,6 +325,8 @@ func (this *WebSocketProxy) worker() {
 }
 
 func (this *WebSocketProxy) pingWorker() {
+	logger.Debugf("Ping worker start")
+	defer logger.Debugf("Ping worker end")
 
 	received := make(chan int, 1)
 	defer close(received)
@@ -401,6 +403,8 @@ func (this *WebSocketProxy) pingWorker() {
 }
 
 func (this *WebSocketProxy) readWorker() {
+	logger.Debugf("Read worker start")
+	defer logger.Debugf("Read worker end")
 
 	done := make(chan int, 1)
 

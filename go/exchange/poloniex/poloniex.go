@@ -76,8 +76,7 @@ func (this *Poloniex) Start() error {
 		go func() {
 			logger.Info()
 			if err := this.ws.Disconnect(); err != nil {
-				logger.Errorf("Disconnect from server failed. err:[%v]", err)
-				return
+				logger.Warnf("Disconnect from server failed. err:[%v]", err)
 			}
 
 			for {
