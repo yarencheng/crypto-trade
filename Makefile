@@ -13,7 +13,7 @@ check: check-docker
 	$(MAKE) check -C go
 
 .PHONY: pre-build
-pre-build: check antlr4
+pre-build: check
 	$(MAKE) pre-build -C go
 
 .PHONY: build
@@ -33,30 +33,18 @@ clean:
 	$(MAKE) clean -C go
 	$(DOCKER) rmi yarencheng/crypto-trade/bitfinex_recorder:latest || true
 	$(DOCKER) rmi yarencheng/crypto-trade/poloniex_recorder:latest || true
-	# $(DOCKER) rmi yarencheng/crypto-trade/antlr4:latest || true
 
 ## docker ############
 
 .PHONY: docker.bitfinex_recorder.build
 docker.bitfinex_recorder.build:
 	docker build -t yarencheng/crypto-trade/bitfinex_recorder:latest --file docker/bitfinex_recorder/Dockerfile .
+	docker build -t yarencheng/crypto-trade/bitfinex_recorder:latest-debug --file docker/bitfinex_recorder/debug.Dockerfile .
 
 .PHONY: docker.poloniex_recorder.build
 docker.poloniex_recorder.build:
 	docker build -t yarencheng/crypto-trade/poloniex_recorder:latest --file docker/poloniex_recorder/Dockerfile .
-
-.PHONY: docker.antlr4.build
-docker.antlr4.build:
-	docker build -t yarencheng/crypto-trade/antlr4:latest --file docker/antlr4/Dockerfile .
-
-## antlr4 ############
-
-#ANTLR4 = docker run -it --rm --workdir `pwd` --volume `pwd`:`pwd` --user `id -u`:`id -g` yarencheng/crypto-trade/antlr4:latest \
-#         -Dlanguage=Go -Xexact-output-dir -long-messages
-#
-#.PHONY: antlr4
-#antlr4: docker.antlr4.build
-#	$(ANTLR4) -package parser -o go/exchange/poloniex/parser/ antlr4/exchange/poloniex/JSON.g4
+	docker build -t yarencheng/crypto-trade/poloniex_recorder:latest-debug --file docker/poloniex_recorder/debug.Dockerfile .
 
 ## check build env #############################
 

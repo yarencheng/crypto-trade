@@ -27,7 +27,7 @@ RUN go get -u github.com/kardianos/govendor
 WORKDIR ${GOPATH}/src/github.com/yarencheng/crypto-trade/go
 RUN pwd
 COPY ./go .
-RUN make install
+RUN go install -v ./...
 RUN cp ${GOPATH}/bin/poloniex_recorder /poloniex_recorder
 
 FROM ubuntu:16.04 AS runtime

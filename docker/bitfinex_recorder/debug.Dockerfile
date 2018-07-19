@@ -27,7 +27,7 @@ RUN go get -u github.com/kardianos/govendor
 WORKDIR ${GOPATH}/src/github.com/yarencheng/crypto-trade/go
 RUN pwd
 COPY ./go .
-RUN go install -v ./...
+RUN go install -race -v ./...
 RUN cp ${GOPATH}/bin/bitfinex_recorder /bitfinex_recorder
 
 FROM ubuntu:16.04 AS runtime

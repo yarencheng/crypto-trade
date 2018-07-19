@@ -27,13 +27,13 @@ RUN go get -u github.com/kardianos/govendor
 WORKDIR ${GOPATH}/src/github.com/yarencheng/crypto-trade/go
 RUN pwd
 COPY ./go .
-RUN go install -v ./...
-RUN cp ${GOPATH}/bin/bitfinex_recorder /bitfinex_recorder
+RUN go install -race -v ./...
+RUN cp ${GOPATH}/bin/poloniex_recorder /poloniex_recorder
 
 FROM ubuntu:16.04 AS runtime
 
 RUN apt-get update && \
     apt-get install -y ca-certificates
 
-COPY --from=build /bitfinex_recorder /bin/.
-ENTRYPOINT [ "bitfinex_recorder" ]
+COPY --from=build /poloniex_recorder /bin/.
+ENTRYPOINT [ "poloniex_recorder" ]
