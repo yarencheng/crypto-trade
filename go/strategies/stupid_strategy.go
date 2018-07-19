@@ -22,26 +22,21 @@ func New() *StupidStrategy {
 	}
 }
 
-func (st *StupidStrategy) Start() {
+func (this *StupidStrategy) Start() error {
 	log.Infoln("Starting")
 
-	st.wg.Add(1)
+	this.wg.Add(1)
 	go func() {
-		defer st.wg.Done()
-		for {
-			select {
-			case <-st.stop:
-				return
-			case order := <-st.LiveOrders:
-				log.Infoln("Get order ", order)
-			}
-		}
+		defer this.wg.Done()
+		this.worker()
 	}()
 
 	log.Infoln("Started")
+
+	return nil
 }
 
-func (st *StupidStrategy) Stop(ctx context.Context) error {
+func (this *StupidStrategy) Stop(ctx context.Context) error {
 	log.Infoln("Stopping")
 
 	wg := sync.WaitGroup{}
@@ -49,8 +44,8 @@ func (st *StupidStrategy) Stop(ctx context.Context) error {
 
 	wg.Add(1)
 	go func() {
-		close(st.stop)
-		st.wg.Wait()
+		close(this.stop)
+		this.wg.Wait()
 		close(wait)
 	}()
 
@@ -61,4 +56,10 @@ func (st *StupidStrategy) Stop(ctx context.Context) error {
 	}
 
 	return ctx.Err()
+}
+
+func (this *StupidStrategy) worker() {
+	log.Infoln("Worker started")
+	defer log.Infoln("Worker finished")
+
 }
