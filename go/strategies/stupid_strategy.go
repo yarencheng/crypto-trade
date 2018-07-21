@@ -64,9 +64,11 @@ func (this *StupidStrategy) worker() {
 	for {
 		select {
 		case <-this.stop:
-			break
+			return
 		case <-this.InOrders:
-			this.OutOrders <- entity.BuyOrderEvent{}
+			this.OutOrders <- entity.BuyOrderEvent{
+				Type: entity.None,
+			}
 		}
 	}
 

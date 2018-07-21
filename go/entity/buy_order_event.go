@@ -12,7 +12,7 @@ const (
 )
 
 type BuyOrderEvent struct {
-	Type       OrderBookEventType
+	Type       BuyOrderEventType
 	CreateDate time.Time
 	Exchange   Exchange
 	From       Currency
