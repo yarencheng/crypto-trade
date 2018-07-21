@@ -2,7 +2,6 @@ package reproducer
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"time"
 
@@ -17,6 +16,7 @@ type SqliteReproducer struct {
 	stop       chan int
 	wg         sync.WaitGroup
 	OrderBooks chan<- entity.OrderBookEvent
+	BuyOrders  <-chan entity.BuyOrderEvent
 }
 
 func New() *SqliteReproducer {
@@ -72,8 +72,11 @@ func (this *SqliteReproducer) worker() {
 		return
 	}
 
+	var allCount, count, percent int64
 	cur := time.Unix(0, 0)
-
+	var allProcessTime time.Duration
+	db.Model(&entity.OrderBookEvent{}).Count(&allCount)
+Loop:
 	for {
 		var orders []entity.OrderBookEvent
 		db.Where("date > ?", cur).Order("date").Limit(100).Find(&orders)
@@ -83,17 +86,29 @@ func (this *SqliteReproducer) worker() {
 		}
 
 		for _, order := range orders {
-			logger.Warnf("order = %v", reflect.ValueOf(order))
+			count++
+			if count*100/allCount >= percent+1 {
+				percent = count * 100 / allCount
+				logger.Infof("Process %v%% [%v/%v] avgTime=%v", percent, count, allCount, allProcessTime/time.Duration(count))
+			}
+
+			startTime := time.Now()
 
 			select {
 			case <-this.stop:
-				break
+				break Loop
 			case this.OrderBooks <- order:
+				<-this.BuyOrders
+
+				processTime := time.Now().Sub(startTime)
+				logger.Debugf("Took [%v] to process [%v]", processTime, order)
+
+				allProcessTime += processTime
 			}
 
 		}
 
-		// break
+		cur = orders[len(orders)-1].Date
 	}
 
 }

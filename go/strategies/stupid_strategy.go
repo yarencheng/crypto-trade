@@ -8,22 +8,21 @@ import (
 	"github.com/yarencheng/crypto-trade/go/logger"
 )
 
-var log = logger.Get("stupid_strategy.go")
-
 type StupidStrategy struct {
-	stop       chan int
-	wg         sync.WaitGroup
-	LiveOrders <-chan entity.OrderBook
+	stop      chan int
+	wg        sync.WaitGroup
+	InOrders  <-chan entity.OrderBookEvent
+	OutOrders chan<- entity.BuyOrderEvent
 }
 
-func New() *StupidStrategy {
+func NewStupidStrategy() *StupidStrategy {
 	return &StupidStrategy{
 		stop: make(chan int, 1),
 	}
 }
 
 func (this *StupidStrategy) Start() error {
-	log.Infoln("Starting")
+	logger.Infoln("Starting")
 
 	this.wg.Add(1)
 	go func() {
@@ -31,13 +30,13 @@ func (this *StupidStrategy) Start() error {
 		this.worker()
 	}()
 
-	log.Infoln("Started")
+	logger.Infoln("Started")
 
 	return nil
 }
 
 func (this *StupidStrategy) Stop(ctx context.Context) error {
-	log.Infoln("Stopping")
+	logger.Infoln("Stopping")
 
 	wg := sync.WaitGroup{}
 	wait := make(chan int)
@@ -52,14 +51,23 @@ func (this *StupidStrategy) Stop(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 	case <-wait:
-		log.Infoln("Stopped")
+		logger.Infoln("Stopped")
 	}
 
 	return ctx.Err()
 }
 
 func (this *StupidStrategy) worker() {
-	log.Infoln("Worker started")
-	defer log.Infoln("Worker finished")
+	logger.Infoln("Worker started")
+	defer logger.Infoln("Worker finished")
+
+	for {
+		select {
+		case <-this.stop:
+			break
+		case <-this.InOrders:
+			this.OutOrders <- entity.BuyOrderEvent{}
+		}
+	}
 
 }

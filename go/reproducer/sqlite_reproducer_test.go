@@ -21,7 +21,7 @@ func TestAsss(t *testing.T) {
 	}()
 
 	re := New()
-	re.Path = "/home/arenx/go/src/github.com/yarencheng/crypto-trade/poloniex.order.sqlite"
+	re.Path = "/home/arenx/go/src/github.com/yarencheng/crypto-trade/all.sqlite"
 	re.OrderBooks = orders
 
 	err := re.Start()
