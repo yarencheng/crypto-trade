@@ -3,6 +3,7 @@ package strategies
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
@@ -65,19 +66,19 @@ func (this *StupidStrategy) worker() {
 		select {
 		case <-this.stop:
 			return
-		case <-this.InOrders:
-			this.OutOrders <- entity.BuyOrderEvent{
-				Type: entity.None,
-			}
+		case order := <-this.InOrders:
 			// this.OutOrders <- entity.BuyOrderEvent{
-			// 	CreateDate: time.Now(),
-			// 	Type:       entity.FillOrKill,
-			// 	Exchange:   order.Exchange,
-			// 	From:       order.From,
-			// 	To:         order.To,
-			// 	Price:      order.Price,
-			// 	Volume:     order.Volume,
+			// 	Type: entity.None,
 			// }
+			this.OutOrders <- entity.BuyOrderEvent{
+				CreateDate: time.Now(),
+				Type:       entity.FillOrKill,
+				Exchange:   order.Exchange,
+				From:       order.From,
+				To:         order.To,
+				Price:      order.Price,
+				Volume:     order.Volume,
+			}
 		}
 	}
 

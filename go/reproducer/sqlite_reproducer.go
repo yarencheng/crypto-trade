@@ -49,8 +49,48 @@ func (this *SqliteReproducer) Start() error {
 	if err != nil {
 		return fmt.Errorf("Open in-memory sqlite failed. err: [%v]", err)
 	}
-	if _, err := this.db.Exec("CREATE TABLE orders (exchang TEXT, from TEXT, to TEXT, price real, volume, REAL);"); err != nil {
+
+	// create table
+	if _, err := this.db.Exec(`
+		CREATE TABLE orders (
+			exchange TEXT NOT NULL,
+			'from' TEXT NOT NULL,
+			'to' TEXT NOT NULL,
+			price REAL NOT NULL,
+			volume REAL NOT NULL
+		);`); err != nil {
 		return fmt.Errorf("Create orders table failed: [%v]", err)
+	}
+	if _, err := this.db.Exec(`
+		CREATE TABLE wallets (
+			date DATETIME NOT NULL,
+			exchange TEXT NOT NULL,
+			currency TEXT NOT NULL,
+			volume REAL NOT NULL
+		);`); err != nil {
+		return fmt.Errorf("Create wallets table failed: [%v]", err)
+	}
+
+	// create index
+	if _, err := this.db.Exec("CREATE INDEX orders_exchange_idx ON orders (exchange);"); err != nil {
+		return fmt.Errorf("Create orders_exchange_idx index failed: [%v]", err)
+	}
+	if _, err := this.db.Exec("CREATE INDEX orders_from_idx ON orders ('from');"); err != nil {
+		return fmt.Errorf("Create orders_from_idx index failed: [%v]", err)
+	}
+	if _, err := this.db.Exec("CREATE INDEX orders_to_idx ON orders ('to');"); err != nil {
+		return fmt.Errorf("Create orders_to_idx index failed: [%v]", err)
+	}
+	if _, err := this.db.Exec("CREATE INDEX orders_price_idx ON orders ('price');"); err != nil {
+		return fmt.Errorf("Create orders_price_idx index failed: [%v]", err)
+	}
+	if _, err := this.db.Exec("CREATE UNIQUE INDEX orders_unique_idx ON orders (price, exchange, 'from', 'to');"); err != nil {
+		return fmt.Errorf("Create orders_unique_idx index failed: [%v]", err)
+	}
+
+	// PRAGMA
+	if _, err := this.db.Exec("PRAGMA auto_vacuum=1;"); err != nil {
+		return fmt.Errorf("Set auto_vacuum failed: [%v]", err)
 	}
 
 	this.wg.Add(1)
@@ -153,99 +193,109 @@ Loop:
 
 func (this *SqliteReproducer) summary() error {
 
-	// rows, err := this.liveOrder.
-	// 	Table("wallets").
-	// 	Select("sum(volume) as volume, currency").
-	// 	Group("currency").
-	// 	Rows()
+	r, err := this.db.Query("SELECT exchange, currency, SUM(volume) as volume FROM wallets GROUP BY exchange,currency;")
+	if err != nil {
+		return fmt.Errorf("Query failed. err: [%v]", err)
+	}
 
-	// if err != nil {
-	// 	return fmt.Errorf("err: [%v]", err)
-	// }
-
-	// for rows.Next() {
-	// 	var ex entity.Currency
-	// 	var v float64
-	// 	err := rows.Scan(&v, &ex)
-	// 	if err != nil {
-	// 		return fmt.Errorf("err: [%v]", err)
-	// 	}
-	// 	logger.Infof("%v:%v", ex, v)
-	// }
+	for r.Next() {
+		var ex string
+		var cur string
+		var volume float64
+		err = r.Scan(&ex, &cur, &volume)
+		if err != nil {
+			return fmt.Errorf("Scan failed. err: [%v]", err)
+		}
+		logger.Infof("%v %v:%v", ex, cur, volume)
+	}
 
 	return nil
 }
 
 func (this *SqliteReproducer) update(e *entity.OrderBookEvent) error {
 
-	// switch e.Type {
-	// case entity.ExchangeRestart:
-	// 	if err := this.liveOrder.Where("exchange == ?", e.Exchange).Delete(Order{}).Error; err != nil {
-	// 		return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
-	// 	}
-	// 	return nil
-	// case entity.Update:
-	// default:
-	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
-	// }
+	switch e.Type {
+	case entity.ExchangeRestart:
+		if _, err := this.db.Exec("DELETE FROM orders WHERE exchange == ?", e.Exchange); err != nil {
+			return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
+		}
+		return nil
+	case entity.Update:
+	default:
+		return fmt.Errorf("Unknown type [%v]", e.Type)
+	}
 
-	// o := Order{
-	// 	Exchange: e.Exchange,
-	// 	From:     e.From,
-	// 	To:       e.To,
-	// 	Price:    e.Price,
-	// 	Volume:   e.Volume,
-	// }
+	if e.Volume == 0 {
+		if _, err := this.db.Exec(
+			"DELETE FROM orders WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?;",
+			e.Exchange, e.From, e.To, e.Price,
+		); err != nil {
+			return fmt.Errorf("Delete all data from exchange [%v] failed, err: [%v]", e.Exchange, err)
+		}
+	} else {
 
-	// if e.Volume == 0 {
-	// 	if err := this.liveOrder.Where("price == ?", e.Price).Delete(Order{}).Error; err != nil {
-	// 		return fmt.Errorf("Delete old order with price [%v] failed. err: [%v]", e.Price, err)
-	// 	}
-	// } else {
-
-	// 	var o Order
-	// 	if err := this.liveOrder.
-	// 		Where(
-	// 			"exchange == ? && from == ? && to == ? && price == ?", e.Exchange, e.From, e.To, e.Price,
-	// 		).
-	// 		Find(&o).Error; err != nil {
-	// 		return fmt.Errorf("Delete old order with price [%v] failed. err: [%v]", e.Price, err)
-	// 	}
-
-	// 	o.Price = e.Price
-
-	// 	if err := this.liveOrder.Save(&o).Error; err != nil {
-	// 		return fmt.Errorf("Create order [%v] failed. err: [%v]", o, err)
-	// 	}
-	// }
+		if _, err := this.db.Exec(
+			"INSERT OR REPLACE INTO orders (exchange , 'from' , 'to' , price , volume) VALUES (?,?,?,?,?);",
+			e.Exchange, e.From, e.To, e.Price, e.Volume,
+		); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
 func (this *SqliteReproducer) buy(e *entity.BuyOrderEvent) error {
-	// switch e.Type {
-	// case entity.None:
-	// 	return nil
-	// case entity.FillOrKill:
-	// 	add := &Wallet{
-	// 		Currency: e.To,
-	// 		Volume:   e.Volume,
-	// 	}
-	// 	sub := &Wallet{
-	// 		Currency: e.From,
-	// 		Volume:   -(e.Price * e.Volume),
-	// 	}
-	// 	logger.Infof("Add: %v  Sub: %v", add, sub)
-	// 	if err := this.liveOrder.Create(sub).Error; err != nil {
-	// 		return fmt.Errorf("Create Wallet failed. err: [%v]", err)
-	// 	}
-	// 	if err := this.liveOrder.Create(add).Error; err != nil {
-	// 		return fmt.Errorf("Create Wallet failed. err: [%v]", err)
-	// 	}
-	// 	return nil
-	// default:
-	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
-	// }
+	switch e.Type {
+	case entity.None:
+		return nil
+	case entity.FillOrKill:
+
+	default:
+		return fmt.Errorf("Unknown type [%v]", e.Type)
+	}
+
+	r, err := this.db.Query(`
+		SELECT
+			volume
+		FROM orders
+		WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?`,
+		e.Exchange, e.From, e.To, e.Price)
+	if err != nil {
+		return fmt.Errorf("Query order in stock failed. err: [%v]", err)
+	}
+
+	if !r.Next() {
+		return fmt.Errorf("out of stock")
+	}
+
+	var volume float64
+	err = r.Scan(&volume)
+	if err != nil {
+		return fmt.Errorf("Scan failed. err: [%v]", err)
+	}
+
+	if e.Volume > volume {
+		return fmt.Errorf("out of stock")
+	}
+
+	if r.Next() {
+		return fmt.Errorf("duplicated data")
+	}
+
+	if _, err := this.db.Exec(
+		"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
+		time.Now(), e.Exchange, e.To, e.Volume,
+	); err != nil {
+		return err
+	}
+
+	if _, err := this.db.Exec(
+		"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
+		time.Now(), e.Exchange, e.From, -(e.Price * e.Volume),
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
