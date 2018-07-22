@@ -2,6 +2,7 @@ package reproducer
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -18,14 +19,19 @@ type SqliteReproducer struct {
 	wg         sync.WaitGroup
 	OrderBooks chan<- entity.OrderBookEvent
 	BuyOrders  <-chan entity.BuyOrderEvent
-	liveOrder  *gorm.DB
+	db         *sql.DB
 }
 
 type Order struct {
-	Exchange entity.Exchange `gorm:"index:exchange"`
-	From     entity.Currency `gorm:"index:froms"`
-	To       entity.Currency `gorm:"index:tos"`
-	Price    float64         `gorm:"index:price"`
+	Exchange entity.Exchange
+	From     entity.Currency
+	To       entity.Currency
+	Price    float64
+	Volume   float64
+}
+
+type Wallet struct {
+	Currency entity.Currency
 	Volume   float64
 }
 
@@ -39,13 +45,12 @@ func (this *SqliteReproducer) Start() error {
 	logger.Infoln("Starting")
 
 	var err error
-	this.liveOrder, err = gorm.Open("sqlite3", ":memory:")
+	this.db, err = sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		return fmt.Errorf("Open in-memory sqlite failed. err: [%v]", err)
 	}
-	if err := this.liveOrder.AutoMigrate(&Order{}).Error; err != nil {
-		logger.Errorf("%v", err)
-		return fmt.Errorf("Create table 'order' failed. err: [%v]", err)
+	if _, err := this.db.Exec("CREATE TABLE orders (exchang TEXT, from TEXT, to TEXT, price real, volume, REAL);"); err != nil {
+		return fmt.Errorf("Create orders table failed: [%v]", err)
 	}
 
 	this.wg.Add(1)
@@ -113,7 +118,7 @@ Loop:
 			}
 
 			if err := this.update(&order); err != nil {
-				logger.Errorf("Update order [%v] failed. err: [%v]", err)
+				logger.Errorf("Update order [%v] failed. err: [%v]", order, err)
 				return
 			}
 
@@ -123,12 +128,16 @@ Loop:
 			case <-this.stop:
 				break Loop
 			case this.OrderBooks <- order:
-				<-this.BuyOrders
+				buy := <-this.BuyOrders
 
 				processTime := time.Now().Sub(startTime)
+				allProcessTime += processTime
 				logger.Debugf("Took [%v] to process [%v]", processTime, order)
 
-				allProcessTime += processTime
+				if err := this.buy(&buy); err != nil {
+					logger.Errorf("Update buy [%v] failed. err: [%v]", buy, err)
+					return
+				}
 			}
 
 		}
@@ -136,38 +145,107 @@ Loop:
 		cur = orders[len(orders)-1].Date
 	}
 
+	if err := this.summary(); err != nil {
+		logger.Errorf("summary failed. err: [%v]", err)
+		return
+	}
+}
+
+func (this *SqliteReproducer) summary() error {
+
+	// rows, err := this.liveOrder.
+	// 	Table("wallets").
+	// 	Select("sum(volume) as volume, currency").
+	// 	Group("currency").
+	// 	Rows()
+
+	// if err != nil {
+	// 	return fmt.Errorf("err: [%v]", err)
+	// }
+
+	// for rows.Next() {
+	// 	var ex entity.Currency
+	// 	var v float64
+	// 	err := rows.Scan(&v, &ex)
+	// 	if err != nil {
+	// 		return fmt.Errorf("err: [%v]", err)
+	// 	}
+	// 	logger.Infof("%v:%v", ex, v)
+	// }
+
+	return nil
 }
 
 func (this *SqliteReproducer) update(e *entity.OrderBookEvent) error {
 
-	switch e.Type {
-	case entity.ExchangeRestart:
-		if err := this.liveOrder.Where("exchange == ?", e.Exchange).Delete(Order{}).Error; err != nil {
-			return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
-		}
-		return nil
-	case entity.Update:
-	default:
-		return fmt.Errorf("Unknown type [%v]", e.Type)
-	}
+	// switch e.Type {
+	// case entity.ExchangeRestart:
+	// 	if err := this.liveOrder.Where("exchange == ?", e.Exchange).Delete(Order{}).Error; err != nil {
+	// 		return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
+	// 	}
+	// 	return nil
+	// case entity.Update:
+	// default:
+	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
+	// }
 
-	o := Order{
-		Exchange: e.Exchange,
-		From:     e.From,
-		To:       e.To,
-		Price:    e.Price,
-		Volume:   e.Volume,
-	}
+	// o := Order{
+	// 	Exchange: e.Exchange,
+	// 	From:     e.From,
+	// 	To:       e.To,
+	// 	Price:    e.Price,
+	// 	Volume:   e.Volume,
+	// }
 
-	if o.Volume == 0 {
-		if err := this.liveOrder.Where("price == ?", o.Price).Delete(Order{}).Error; err != nil {
-			return fmt.Errorf("Delete old order with price [%v] failed. err: [%v]", o.Price, err)
-		}
-	} else {
-		if err := this.liveOrder.Create(o).Error; err != nil {
-			return fmt.Errorf("Create order [%v] failed. err: [%v]", o, err)
-		}
-	}
+	// if e.Volume == 0 {
+	// 	if err := this.liveOrder.Where("price == ?", e.Price).Delete(Order{}).Error; err != nil {
+	// 		return fmt.Errorf("Delete old order with price [%v] failed. err: [%v]", e.Price, err)
+	// 	}
+	// } else {
+
+	// 	var o Order
+	// 	if err := this.liveOrder.
+	// 		Where(
+	// 			"exchange == ? && from == ? && to == ? && price == ?", e.Exchange, e.From, e.To, e.Price,
+	// 		).
+	// 		Find(&o).Error; err != nil {
+	// 		return fmt.Errorf("Delete old order with price [%v] failed. err: [%v]", e.Price, err)
+	// 	}
+
+	// 	o.Price = e.Price
+
+	// 	if err := this.liveOrder.Save(&o).Error; err != nil {
+	// 		return fmt.Errorf("Create order [%v] failed. err: [%v]", o, err)
+	// 	}
+	// }
+
+	return nil
+}
+
+func (this *SqliteReproducer) buy(e *entity.BuyOrderEvent) error {
+	// switch e.Type {
+	// case entity.None:
+	// 	return nil
+	// case entity.FillOrKill:
+	// 	add := &Wallet{
+	// 		Currency: e.To,
+	// 		Volume:   e.Volume,
+	// 	}
+	// 	sub := &Wallet{
+	// 		Currency: e.From,
+	// 		Volume:   -(e.Price * e.Volume),
+	// 	}
+	// 	logger.Infof("Add: %v  Sub: %v", add, sub)
+	// 	if err := this.liveOrder.Create(sub).Error; err != nil {
+	// 		return fmt.Errorf("Create Wallet failed. err: [%v]", err)
+	// 	}
+	// 	if err := this.liveOrder.Create(add).Error; err != nil {
+	// 		return fmt.Errorf("Create Wallet failed. err: [%v]", err)
+	// 	}
+	// 	return nil
+	// default:
+	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
+	// }
 
 	return nil
 }
