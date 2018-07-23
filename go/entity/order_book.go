@@ -7,7 +7,7 @@ import (
 
 type OrderBook struct {
 	Exchange Exchange
-	Time     time.Time
+	Date     time.Time
 	From     Currency
 	To       Currency
 	Price    float64
