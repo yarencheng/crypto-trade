@@ -141,9 +141,11 @@ func (this *Poloniex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 	this.readStop = make(chan int, 1)
 
 	this.OrderBooks <- entity.OrderBookEvent{
-		Exchange: entity.Poloniex,
-		Date:     time.Now(),
-		Type:     entity.ExchangeRestart,
+		OrderBook: entity.OrderBook{
+			Exchange: entity.Poloniex,
+			Date:     time.Now(),
+		},
+		Type: entity.ExchangeRestart,
 	}
 
 	for _, id := range this.subChannels {
@@ -296,13 +298,15 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 			volume := vs.Float()
 
 			order := entity.OrderBookEvent{
-				Type:     entity.Update,
-				Exchange: entity.Poloniex,
-				Date:     time.Now(),
-				From:     c2,
-				To:       c1,
-				Price:    1 / price,
-				Volume:   price * volume,
+				Type: entity.Update,
+				OrderBook: entity.OrderBook{
+					Exchange: entity.Poloniex,
+					Date:     time.Now(),
+					From:     c2,
+					To:       c1,
+					Price:    1 / price,
+					Volume:   price * volume,
+				},
 			}
 
 			logger.Debugf("Receive order [%v]", order)
@@ -320,13 +324,15 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 			volume := vs.Float()
 
 			order := entity.OrderBookEvent{
-				Type:     entity.Update,
-				Exchange: entity.Poloniex,
-				Date:     time.Now(),
-				From:     c1,
-				To:       c2,
-				Price:    price,
-				Volume:   volume,
+				Type: entity.Update,
+				OrderBook: entity.OrderBook{
+					Exchange: entity.Poloniex,
+					Date:     time.Now(),
+					From:     c1,
+					To:       c2,
+					Price:    price,
+					Volume:   volume,
+				},
 			}
 
 			logger.Debugf("Receive order [%v]", order)
@@ -347,23 +353,27 @@ func (p *Poloniex) handlePriceAggregatedBook(c1, c2 entity.Currency, gj *gjson.R
 		var order *entity.OrderBookEvent
 		if isAsk {
 			order = &entity.OrderBookEvent{
-				Type:     entity.Update,
-				Exchange: entity.Poloniex,
-				Date:     time.Now(),
-				From:     c2,
-				To:       c1,
-				Price:    1 / price,
-				Volume:   price * volume,
+				Type: entity.Update,
+				OrderBook: entity.OrderBook{
+					Exchange: entity.Poloniex,
+					Date:     time.Now(),
+					From:     c2,
+					To:       c1,
+					Price:    1 / price,
+					Volume:   price * volume,
+				},
 			}
 		} else {
 			order = &entity.OrderBookEvent{
-				Type:     entity.Update,
-				Exchange: entity.Poloniex,
-				Date:     time.Now(),
-				From:     c1,
-				To:       c2,
-				Price:    price,
-				Volume:   volume,
+				Type: entity.Update,
+				OrderBook: entity.OrderBook{
+					Exchange: entity.Poloniex,
+					Date:     time.Now(),
+					From:     c1,
+					To:       c2,
+					Price:    price,
+					Volume:   volume,
+				},
 			}
 		}
 

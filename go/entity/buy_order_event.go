@@ -14,9 +14,5 @@ const (
 type BuyOrderEvent struct {
 	Type       BuyOrderEventType
 	CreateDate time.Time
-	Exchange   Exchange
-	From       Currency
-	To         Currency
-	Price      float64
-	Volume     float64
+	OrderBook
 }

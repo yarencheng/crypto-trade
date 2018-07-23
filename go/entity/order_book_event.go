@@ -1,9 +1,5 @@
 package entity
 
-import (
-	"time"
-)
-
 type OrderBookEventType string
 
 const (
@@ -12,11 +8,6 @@ const (
 )
 
 type OrderBookEvent struct {
-	Type     OrderBookEventType
-	Date     time.Time
-	Exchange Exchange
-	From     Currency
-	To       Currency
-	Price    float64
-	Volume   float64
+	Type OrderBookEventType
+	OrderBook
 }

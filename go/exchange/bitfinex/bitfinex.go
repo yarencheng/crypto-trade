@@ -135,9 +135,11 @@ func (this *Bitfinex) OnWsConnected(in <-chan *gjson.Result, out chan<- *gjson.R
 	this.readStop = make(chan int, 1)
 
 	this.OrderBooks <- entity.OrderBookEvent{
-		Exchange: entity.Bitfinex,
-		Date:     time.Now(),
-		Type:     entity.ExchangeRestart,
+		OrderBook: entity.OrderBook{
+			Exchange: entity.Bitfinex,
+			Date:     time.Now(),
+		},
+		Type: entity.ExchangeRestart,
 	}
 
 	for _, symbol := range this.subBookSymbols.Values() {
@@ -318,23 +320,27 @@ func (b *Bitfinex) handleOrderBookUpdate(pair string, gj *gjson.Result) error {
 	var order *entity.OrderBookEvent
 	if amount > 0 {
 		order = &entity.OrderBookEvent{
-			Type:     entity.Update,
-			Exchange: entity.Bitfinex,
-			Date:     time.Now(),
-			From:     c2,
-			To:       c1,
-			Price:    price,
-			Volume:   amount * count,
+			Type: entity.Update,
+			OrderBook: entity.OrderBook{
+				Exchange: entity.Bitfinex,
+				Date:     time.Now(),
+				From:     c2,
+				To:       c1,
+				Price:    price,
+				Volume:   amount * count,
+			},
 		}
 	} else {
 		order = &entity.OrderBookEvent{
-			Type:     entity.Update,
-			Exchange: entity.Bitfinex,
-			Date:     time.Now(),
-			From:     c1,
-			To:       c2,
-			Price:    1 / price,
-			Volume:   -amount * count,
+			Type: entity.Update,
+			OrderBook: entity.OrderBook{
+				Exchange: entity.Bitfinex,
+				Date:     time.Now(),
+				From:     c1,
+				To:       c2,
+				Price:    1 / price,
+				Volume:   -amount * count,
+			},
 		}
 	}
 

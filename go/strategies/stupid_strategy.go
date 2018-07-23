@@ -73,11 +73,13 @@ func (this *StupidStrategy) worker() {
 			this.OutOrders <- entity.BuyOrderEvent{
 				CreateDate: time.Now(),
 				Type:       entity.FillOrKill,
-				Exchange:   order.Exchange,
-				From:       order.From,
-				To:         order.To,
-				Price:      order.Price,
-				Volume:     order.Volume,
+				OrderBook: entity.OrderBook{
+					Exchange: order.Exchange,
+					From:     order.From,
+					To:       order.To,
+					Price:    order.Price,
+					Volume:   order.Volume,
+				},
 			}
 		}
 	}
