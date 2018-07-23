@@ -11,7 +11,7 @@ import (
 
 const sqliteSchema = `
 -- table
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
 	exchange 	TEXT 		NOT NULL,
 	'from' 		TEXT 		NOT NULL,
 	'to' 		TEXT 		NOT NULL,
@@ -21,11 +21,36 @@ CREATE TABLE orders (
 );
 
 -- index
-CREATE 			INDEX orders_exchange_idx 	ON orders (exchange);
-CREATE 			INDEX orders_from_idx 		ON orders ('from');
-CREATE 			INDEX orders_to_idx 		ON orders ('to');
-CREATE 			INDEX orders_price_idx 		ON orders ('price');
-CREATE UNIQUE 	INDEX orders_unique_idx 	ON orders (price, exchange, 'from', 'to');
+CREATE 			INDEX IF NOT EXISTS orders_exchange_idx 	ON orders (exchange);
+CREATE 			INDEX IF NOT EXISTS orders_from_idx 		ON orders ('from');
+CREATE 			INDEX IF NOT EXISTS orders_to_idx 			ON orders ('to');
+CREATE 			INDEX IF NOT EXISTS orders_price_idx 		ON orders ('price');
+CREATE UNIQUE 	INDEX IF NOT EXISTS orders_unique_idx 		ON orders (price, exchange, 'from', 'to');
+
+-- table
+CREATE TABLE IF NOT EXISTS wallets (
+	exchange 	TEXT 		NOT NULL,
+	currency	TEXT 		NOT NULL,
+	volume 		REAL 		NOT NULL,
+	date		datetime 	NOT NULL
+);
+
+-- table
+CREATE TABLE IF NOT EXISTS order_book_events (
+	date		datetime 	NOT NULL,
+	'type'	 	TEXT 		NOT NULL,
+	exchange 	TEXT 		NOT NULL,
+	'from' 		TEXT 		NOT NULL,
+	'to' 		TEXT 		NOT NULL,
+	price 		REAL 		NOT NULL,
+	volume 		REAL 		NOT NULL
+);
+
+CREATE 			INDEX IF NOT EXISTS order_book_events_exchange_idx 		ON order_book_events (exchange);
+CREATE 			INDEX IF NOT EXISTS order_book_events_from_idx 			ON order_book_events ('from');
+CREATE 			INDEX IF NOT EXISTS order_book_events_to_idx 			ON order_book_events ('to');
+CREATE 			INDEX IF NOT EXISTS order_book_events_price_idx 		ON order_book_events ('price');
+CREATE UNIQUE 	INDEX IF NOT EXISTS order_book_events_date_idx 			ON order_book_events ('date');
 
 PRAGMA auto_vacuum=1;
 `
@@ -34,12 +59,12 @@ type DB struct {
 	*sql.DB
 }
 
-func OpenSQLite() (*DB, error) {
+func OpenSQLite(path string) (*DB, error) {
 	this := &DB{}
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, fmt.Errorf("Open in-memory sqlite failed. err: [%v]", err)
+		return nil, fmt.Errorf("Open sqlite failed. err: [%v]", err)
 	}
 
 	_, err = db.Exec(sqliteSchema)
@@ -66,7 +91,30 @@ func (this *DB) UpdateOrder(ob *entity.OrderBook) error {
 	}
 
 	return nil
+}
 
+func (this *DB) CountOrderBookEvent() (int64, error) {
+
+	r, err := this.Query(`
+		SELECT COUNT(*) FROM order_book_events;`,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("Query failed. err: [%v]", err)
+	}
+
+	var count int64
+
+	if !r.Next() {
+		return 0, fmt.Errorf("No result")
+	}
+
+	err = r.Scan(&count)
+
+	if err != nil {
+		return 0, fmt.Errorf("Scan failed. err: [%v]", err)
+	}
+
+	return count, nil
 }
 
 func (this *DB) RemoveOrderByExchange(ex entity.Exchange) error {

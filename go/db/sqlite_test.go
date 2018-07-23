@@ -13,7 +13,8 @@ func Test_SQLite_OpenSQLite(t *testing.T) {
 	t.Parallel()
 
 	// action
-	db, err := OpenSQLite()
+	db, err := OpenSQLite(":memory:")
+	defer db.Close()
 
 	// assert
 	assert.NotNil(t, db)
@@ -24,9 +25,10 @@ func Test_SQLite_RemoveOrderByExchange(t *testing.T) {
 	t.Parallel()
 
 	// arrange
-	db, err := OpenSQLite()
+	db, err := OpenSQLite(":memory:")
 	require.NoError(t, err)
 	require.NotNil(t, db)
+	defer db.Close()
 
 	_, err = db.Exec(`
 		INSERT INTO orders ('exchange', 'from', 'to', 'price', 'volume', 'update_date')
@@ -49,9 +51,10 @@ func Test_SQLite_UpdateOrder(t *testing.T) {
 	t.Parallel()
 
 	// arrange
-	db, err := OpenSQLite()
+	db, err := OpenSQLite(":memory:")
 	require.NoError(t, err)
 	require.NotNil(t, db)
+	defer db.Close()
 	expected := &entity.OrderBook{
 		Date:     time.Now(),
 		Exchange: entity.Exchange("eee"),
@@ -78,4 +81,28 @@ func Test_SQLite_UpdateOrder(t *testing.T) {
 	err = r.Scan(&exchange, &from, &to, &price, &volume, &date)
 	require.NoError(t, err)
 	require.False(t, r.Next())
+}
+
+func Test_SQLite_CountOrderBookEvent(t *testing.T) {
+	t.Parallel()
+
+	// arrange
+	db, err := OpenSQLite(":memory:")
+	require.NoError(t, err)
+	require.NotNil(t, db)
+	defer db.Close()
+
+	_, err = db.Exec(`
+		INSERT INTO order_book_events ('type', 'exchange', 'from', 'to', 'price', 'volume', 'date')
+		VALUES (?, ?, ?, ?, ?, ?, ?);`,
+		"ttt", "eee", "fff", "ttt", 111, 222, time.Now(),
+	)
+	require.NoError(t, err)
+
+	// action
+	count, err := db.CountOrderBookEvent()
+	require.NoError(t, err)
+
+	// assert
+	assert.EqualValues(t, 1, count)
 }

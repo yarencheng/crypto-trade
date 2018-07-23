@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -12,9 +11,4 @@ type OrderBook struct {
 	To       Currency
 	Price    float64
 	Volume   float64
-}
-
-func (o OrderBook) String() string {
-	j, _ := json.Marshal(o)
-	return string(j)
 }

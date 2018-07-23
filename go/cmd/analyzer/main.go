@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yarencheng/crypto-trade/go/analyzer"
 	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
-	"github.com/yarencheng/crypto-trade/go/reproducer"
 	"github.com/yarencheng/crypto-trade/go/strategies"
 	"github.com/yarencheng/gospring/applicationcontext"
 	"github.com/yarencheng/gospring/v1"
@@ -20,9 +20,9 @@ func main() {
 	ctx := applicationcontext.Default()
 
 	err := ctx.AddConfigs(&v1.Bean{
-		ID:        "reproducer",
-		Type:      v1.T(reproducer.SqliteReproducer{}),
-		FactoryFn: reproducer.New,
+		ID:        "analyzer",
+		Type:      v1.T(analyzer.Analyzer{}),
+		FactoryFn: analyzer.New,
 		Properties: []v1.Property{
 			{
 				Name:   "OrderBooks",
@@ -31,7 +31,7 @@ func main() {
 				Name:   "BuyOrders",
 				Config: "out_orders",
 			}, {
-				Name:   "Path",
+				Name:   "OrderBookPath",
 				Config: v1.V("all.sqlite"),
 			},
 		},
@@ -62,9 +62,9 @@ func main() {
 		logger.Fatalf("Add configs to ctx failed. err: [%v]", err)
 	}
 
-	_, err = ctx.GetByID("reproducer")
+	_, err = ctx.GetByID("analyzer")
 	if err != nil {
-		logger.Fatalf("Failed to get reproducer. err: [%v]", err)
+		logger.Fatalf("Failed to get analyzer. err: [%v]", err)
 	}
 
 	_, err = ctx.GetByID("stupid_strategy")
