@@ -33,6 +33,7 @@ func (this *Analyzer) Start() error {
 	logger.Infoln("Starting")
 
 	var err error
+	logger.Infof("Open [%v]", this.ResultPath)
 	this.db, err = db.OpenSQLite(this.ResultPath)
 	if err != nil {
 		return fmt.Errorf("Open sqlite failed. err: [%v]", err)
@@ -151,6 +152,13 @@ func (this *Analyzer) worker() {
 		}
 	}()
 
+	defer func() {
+		err = this.summary()
+		if err != nil {
+			logger.Warnf("Summary failed. err: [%v]", err)
+		}
+	}()
+
 	for {
 
 		r, err := query.Query(t)
@@ -231,6 +239,7 @@ func (this *Analyzer) worker() {
 			break
 		}
 	}
+
 }
 
 func (this *Analyzer) recordProcessTimes(data []struct {
@@ -265,21 +274,46 @@ func (this *Analyzer) recordProcessTimes(data []struct {
 
 func (this *Analyzer) summary() error {
 
-	// r, err := this.db.Query("SELECT exchange, currency, SUM(volume) as volume FROM wallets GROUP BY exchange,currency;")
-	// if err != nil {
-	// 	return fmt.Errorf("Query failed. err: [%v]", err)
-	// }
+	r, err := this.db.Query(`SELECT COUNT(*) FROM process_time`)
+	if err != nil {
+		return err
+	}
+	if !r.Next() {
+		return fmt.Errorf("No result")
+	}
 
-	// for r.Next() {
-	// 	var ex string
-	// 	var cur string
-	// 	var volume float64
-	// 	err = r.Scan(&ex, &cur, &volume)
-	// 	if err != nil {
-	// 		return fmt.Errorf("Scan failed. err: [%v]", err)
-	// 	}
-	// 	logger.Infof("%v %v:%v", ex, cur, volume)
-	// }
+	count := 0
+	err = r.Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	r, err = this.db.Query(`
+		SELECT (
+			SELECT SUM(delayNs)/COUNT(*) FROM process_time
+		),(
+			SELECT delayNs FROM process_time ORDER BY delayNs LIMIT 1 OFFSET (?1 * 1 / 4)
+		),(
+			SELECT delayNs FROM process_time ORDER BY delayNs LIMIT 1 OFFSET (?1 * 2 / 4)
+		),(
+			SELECT delayNs FROM process_time ORDER BY delayNs LIMIT 1 OFFSET (?1 * 3 / 4)
+		);
+	`, count)
+	if err != nil {
+		return err
+	}
+
+	if !r.Next() {
+		return fmt.Errorf("No result")
+	}
+
+	var avg, q1, q2, q3 time.Duration
+	err = r.Scan(&avg, &q1, &q2, &q3)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Process time: avg[%v] q1[%v] q2[%v] q3[%v]", avg, q1, q2, q3)
 
 	return nil
 }
