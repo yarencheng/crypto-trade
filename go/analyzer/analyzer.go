@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -14,6 +15,7 @@ import (
 
 type Analyzer struct {
 	OrderBookPath string
+	ResultPath    string
 	stop          chan int
 	wg            sync.WaitGroup
 	OrderBooks    chan<- entity.OrderBookEvent
@@ -32,9 +34,9 @@ func (this *Analyzer) Start() error {
 	logger.Infoln("Starting")
 
 	var err error
-	this.db, err = db.OpenSQLite(":memory:")
+	this.db, err = db.OpenSQLite(this.ResultPath)
 	if err != nil {
-		return fmt.Errorf("Open in-memory sqlite failed. err: [%v]", err)
+		return fmt.Errorf("Open sqlite failed. err: [%v]", err)
 	}
 
 	logger.Infof("Open [%v]", this.OrderBookPath)
@@ -126,7 +128,32 @@ func (this *Analyzer) worker() {
 	var price float64
 	var volume float64
 
+	count := new(int64)
+	allCount, err := this.orderBookDB.CountOrderBookEvent()
+	if err != nil {
+		logger.Warnf("Get count of orders failed. err: [%v]", err)
+		return
+	}
+
+	logger.Infof("Start to process [%v] orders.", allCount)
+
+	stoplog := make(chan int, 1)
+	defer close(stoplog)
+	go func() {
+		t := time.Tick(time.Second)
+		for {
+			select {
+			case <-stoplog:
+				return
+			case <-t:
+				c := atomic.LoadInt64(count)
+				logger.Infof("Process [%v-%v%%] orders.", c, c*100/allCount)
+			}
+		}
+	}()
+
 	for {
+
 		r, err := query.Query(t)
 		if err != nil {
 			logger.Warnf("Query failed. err: [%v]", err)
@@ -134,8 +161,13 @@ func (this *Analyzer) worker() {
 		}
 
 		isEmpty := true
+		processTime := make([]struct {
+			date  time.Time
+			delay time.Duration
+		}, 0, 100)
 
 		for r.Next() {
+			atomic.AddInt64(count, 1)
 			isEmpty = false
 
 			err = r.Scan(&tvpe, &exchange, &from, &to, &price, &volume, &t)
@@ -157,7 +189,41 @@ func (this *Analyzer) worker() {
 				},
 			}
 
-			logger.Debugf("order %v", order)
+			logger.Debugf("order [%v]", order)
+
+			start := time.Now()
+
+			select {
+			case <-this.stop:
+				return
+			case this.OrderBooks <- order:
+			}
+
+			var buy entity.BuyOrderEvent
+			select {
+			case <-this.stop:
+				return
+			case buy = <-this.BuyOrders:
+			}
+
+			delay := time.Now().Sub(start)
+
+			processTime = append(processTime, struct {
+				date  time.Time
+				delay time.Duration
+			}{
+				order.Date,
+				delay,
+			})
+
+			logger.Debugf("buy [%v]", buy)
+
+		}
+
+		err = this.recordProcessTimes(processTime)
+		if err != nil {
+			logger.Warnf("Record process time failed. err: [%v]", err)
+			return
 		}
 
 		r.Close()
@@ -166,6 +232,45 @@ func (this *Analyzer) worker() {
 			break
 		}
 	}
+}
+
+func (this *Analyzer) recordProcessTimes(data []struct {
+	date  time.Time
+	delay time.Duration
+}) error {
+
+	tx, err := this.db.Begin()
+	if err != nil {
+		return fmt.Errorf("Start TX failed. err: [%v]", err)
+	}
+
+	// recordProcessTimeStmt, err := this.db.Prepare(`
+	// 		INSERT INTO process_time ('event_date', 'delayNs')
+	// 		VALUES (?, ?)
+	// 	;`)
+
+	// if err != nil {
+	// 	return fmt.Errorf("Create prepare statement for querying order failed. err: [%v]", err)
+	// }
+
+	for _, d := range data {
+		_, err := this.db.Exec(`
+		INSERT INTO process_time ('event_date', 'delayNs')
+		VALUES (?, ?)
+	;`, d.date, d.delay)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Update time failed. err: [%v]", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("Commit TX failed. err: [%v]", err)
+	}
+
+	return nil
+
 }
 
 func (this *Analyzer) summary() error {

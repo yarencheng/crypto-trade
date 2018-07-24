@@ -33,6 +33,9 @@ func main() {
 			}, {
 				Name:   "OrderBookPath",
 				Config: v1.V("all.sqlite"),
+			}, {
+				Name:   "ResultPath",
+				Config: v1.V("result.sqlite"),
 			},
 		},
 	}, &v1.Bean{
@@ -51,11 +54,11 @@ func main() {
 	}, &v1.Channel{
 		ID:   "in_orders",
 		Type: v1.T(entity.OrderBookEvent{}),
-		Size: 1000,
+		Size: 1,
 	}, &v1.Channel{
 		ID:   "out_orders",
 		Type: v1.T(entity.BuyOrderEvent{}),
-		Size: 1000,
+		Size: 1,
 	})
 
 	if err != nil {

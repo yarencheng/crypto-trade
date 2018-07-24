@@ -67,6 +67,7 @@ func (this *StupidStrategy) worker() {
 		case <-this.stop:
 			return
 		case order := <-this.InOrders:
+			logger.Debugf("Receive an order [%v]", order)
 			// this.OutOrders <- entity.BuyOrderEvent{
 			// 	Type: entity.None,
 			// }

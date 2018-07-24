@@ -52,6 +52,13 @@ CREATE 			INDEX IF NOT EXISTS order_book_events_to_idx 			ON order_book_events (
 CREATE 			INDEX IF NOT EXISTS order_book_events_price_idx 		ON order_book_events ('price');
 CREATE UNIQUE 	INDEX IF NOT EXISTS order_book_events_date_idx 			ON order_book_events ('date');
 
+-- table
+CREATE TABLE IF NOT EXISTS process_time (
+	event_date	DATETIME 	NOT NULL,
+	delayNs		INTEGER		NOT NULL
+);
+CREATE UNIQUE 	INDEX IF NOT EXISTS process_time_events_date_idx	ON process_time ('event_date');
+
 PRAGMA auto_vacuum=1;
 `
 
