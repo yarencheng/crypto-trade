@@ -198,6 +198,12 @@ func (this *Analyzer) worker() {
 
 			logger.Debugf("order [%v]", order)
 
+			err = this.updateOrder(&order)
+			if err != nil {
+				logger.Warnf("Update order failed. err: [%v]", err)
+				return
+			}
+
 			start := time.Now()
 
 			select {
@@ -222,6 +228,12 @@ func (this *Analyzer) worker() {
 				order.Date,
 				delay,
 			})
+
+			err = this.processBuy(&buy)
+			if err != nil {
+				logger.Warnf("Handle bue failed. err: [%v]", err)
+				return
+			}
 
 			logger.Debugf("buy [%v]", buy)
 
@@ -318,90 +330,101 @@ func (this *Analyzer) summary() error {
 	return nil
 }
 
-func (this *Analyzer) update(e *entity.OrderBookEvent) error {
+func (this *Analyzer) updateOrder(e *entity.OrderBookEvent) error {
 
-	// switch e.Type {
-	// case entity.ExchangeRestart:
-	// 	if _, err := this.db.Exec("DELETE FROM orders WHERE exchange == ?", e.Exchange); err != nil {
-	// 		return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
-	// 	}
-	// 	return nil
-	// case entity.Update:
-	// default:
-	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
-	// }
+	switch e.Type {
+	case entity.ExchangeRestart:
+		if _, err := this.db.Exec(
+			`DELETE FROM orders WHERE exchange == ?`,
+			e.Exchange,
+		); err != nil {
+			return fmt.Errorf("Delete old order with exchange [%v] failed. err: [%v]", e.Exchange, err)
+		}
+		return nil
+	case entity.Update:
+	default:
+		return fmt.Errorf("Unknown type [%v]", e.Type)
+	}
 
-	// if e.Volume == 0 {
-	// 	if _, err := this.db.Exec(
-	// 		"DELETE FROM orders WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?;",
-	// 		e.Exchange, e.From, e.To, e.Price,
-	// 	); err != nil {
-	// 		return fmt.Errorf("Delete all data from exchange [%v] failed, err: [%v]", e.Exchange, err)
-	// 	}
-	// } else {
+	if e.Volume == 0 {
+		if _, err := this.db.Exec(
+			"DELETE FROM orders WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?;",
+			e.Exchange, e.From, e.To, e.Price,
+		); err != nil {
+			return fmt.Errorf("Delete order [%v] failed, err: [%v]", e, err)
+		}
+	} else {
 
-	// 	if _, err := this.db.Exec(
-	// 		"INSERT OR REPLACE INTO orders (exchange , 'from' , 'to' , price , volume) VALUES (?,?,?,?,?);",
-	// 		e.Exchange, e.From, e.To, e.Price, e.Volume,
-	// 	); err != nil {
-	// 		return err
-	// 	}
-	// }
+		if _, err := this.db.Exec(
+			"INSERT OR REPLACE INTO orders (exchange , 'from' , 'to' , price , volume, update_date) VALUES (?,?,?,?,?,?);",
+			e.Exchange, e.From, e.To, e.Price, e.Volume, e.Date,
+		); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
-func (this *Analyzer) buy(e *entity.BuyOrderEvent) error {
-	// switch e.Type {
-	// case entity.None:
-	// 	return nil
-	// case entity.FillOrKill:
+func (this *Analyzer) processBuy(e *entity.BuyOrderEvent) error {
+	switch e.Type {
+	case entity.None:
+		return nil
+	case entity.FillOrKill:
 
-	// default:
-	// 	return fmt.Errorf("Unknown type [%v]", e.Type)
-	// }
+	default:
+		return fmt.Errorf("Unknown type [%v]", e.Type)
+	}
 
-	// r, err := this.db.Query(`
-	// 	SELECT
-	// 		volume
-	// 	FROM orders
-	// 	WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?`,
-	// 	e.Exchange, e.From, e.To, e.Price)
-	// if err != nil {
-	// 	return fmt.Errorf("Query order in stock failed. err: [%v]", err)
-	// }
+	r, err := this.db.Query(`
+		SELECT volume
+		FROM orders
+		WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?`,
+		e.Exchange, e.From, e.To, e.Price)
+	if err != nil {
+		return fmt.Errorf("Query order in stock failed. err: [%v]", err)
+	}
 
-	// if !r.Next() {
-	// 	return fmt.Errorf("out of stock")
-	// }
+	if !r.Next() {
+		return fmt.Errorf("out of stock")
+	}
 
-	// var volume float64
-	// err = r.Scan(&volume)
-	// if err != nil {
-	// 	return fmt.Errorf("Scan failed. err: [%v]", err)
-	// }
+	var volume float64
+	err = r.Scan(&volume)
+	if err != nil {
+		return fmt.Errorf("Scan failed. err: [%v]", err)
+	}
 
-	// if e.Volume > volume {
-	// 	return fmt.Errorf("out of stock")
-	// }
+	if e.Volume > volume {
+		return fmt.Errorf("out of stock")
+	}
 
-	// if r.Next() {
-	// 	return fmt.Errorf("duplicated data")
-	// }
+	if r.Next() {
+		return fmt.Errorf("duplicated data")
+	}
 
-	// if _, err := this.db.Exec(
-	// 	"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
-	// 	time.Now(), e.Exchange, e.To, e.Volume,
-	// ); err != nil {
-	// 	return err
-	// }
+	_, err = this.db.Exec(`
+		UPDATE orders
+		SET volume = volume - ? , update_date = ?
+		WHERE exchange == ? AND 'from' == ? AND 'to' == ? AND price == ?`,
+		e.Volume, time.Now(), e.Exchange, e.From, e.To, e.Price)
+	if err != nil {
+		return fmt.Errorf("Query order in stock failed. err: [%v]", err)
+	}
 
-	// if _, err := this.db.Exec(
-	// 	"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
-	// 	time.Now(), e.Exchange, e.From, -(e.Price * e.Volume),
-	// ); err != nil {
-	// 	return err
-	// }
+	if _, err := this.db.Exec(
+		"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
+		time.Now(), e.Exchange, e.To, e.Volume,
+	); err != nil {
+		return err
+	}
+
+	if _, err := this.db.Exec(
+		"INSERT INTO wallets (date, exchange, currency, volume) VALUES (?,?,?,?);",
+		time.Now(), e.Exchange, e.From, -(e.Price * e.Volume),
+	); err != nil {
+		return err
+	}
 
 	return nil
 }

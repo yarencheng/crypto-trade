@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS wallets (
 	volume 		REAL 		NOT NULL,
 	date		datetime 	NOT NULL
 );
+CREATE UNIQUE 	INDEX IF NOT EXISTS wallets_date_idx	ON wallets ('date');
 
 -- table
 CREATE TABLE IF NOT EXISTS order_book_events (
