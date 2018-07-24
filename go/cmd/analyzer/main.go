@@ -34,8 +34,9 @@ func main() {
 				Name:   "OrderBookPath",
 				Config: v1.V("all.sqlite"),
 			}, {
-				Name:   "ResultPath",
-				Config: v1.V("result.sqlite"),
+				Name: "ResultPath",
+				// Config: v1.V("/run/user/1000/result.sqlite"),
+				Config: v1.V("file::memory:?cache=shared"),
 			},
 		},
 	}, &v1.Bean{

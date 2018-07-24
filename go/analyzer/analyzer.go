@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yarencheng/crypto-trade/go/db"
 	"github.com/yarencheng/crypto-trade/go/entity"
 	"github.com/yarencheng/crypto-trade/go/logger"
@@ -70,7 +69,7 @@ func (this *Analyzer) Stop(ctx context.Context) error {
 		defer close(wait)
 
 		if e := this.db.Close(); e != nil {
-			logger.Warnf("Close in-memory sqlite failed. err: [%v]", e)
+			logger.Warnf("Close sqlite failed. err: [%v]", e)
 			err = e
 			return
 		}
@@ -244,17 +243,8 @@ func (this *Analyzer) recordProcessTimes(data []struct {
 		return fmt.Errorf("Start TX failed. err: [%v]", err)
 	}
 
-	// recordProcessTimeStmt, err := this.db.Prepare(`
-	// 		INSERT INTO process_time ('event_date', 'delayNs')
-	// 		VALUES (?, ?)
-	// 	;`)
-
-	// if err != nil {
-	// 	return fmt.Errorf("Create prepare statement for querying order failed. err: [%v]", err)
-	// }
-
 	for _, d := range data {
-		_, err := this.db.Exec(`
+		_, err = this.db.Exec(`
 		INSERT INTO process_time ('event_date', 'delayNs')
 		VALUES (?, ?)
 	;`, d.date, d.delay)
