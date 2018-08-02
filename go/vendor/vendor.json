@@ -47,6 +47,22 @@
 			"versionExact": "v1.9.0"
 		},
 		{
+			"checksumSHA1": "EMOp3CuX8cfFbxn00GMEDOajyEQ=",
+			"path": "github.com/emirpasic/gods/trees",
+			"revision": "f6c17b524822278a87e3b3bd809fec33b51f5b46",
+			"revisionTime": "2017-03-06T04:24:02Z",
+			"version": "v1",
+			"versionExact": "v1.9.0"
+		},
+		{
+			"checksumSHA1": "3J8oI+7zjVaiLoFWsitJS2rFPFA=",
+			"path": "github.com/emirpasic/gods/trees/avltree",
+			"revision": "f6c17b524822278a87e3b3bd809fec33b51f5b46",
+			"revisionTime": "2017-03-06T04:24:02Z",
+			"version": "v1",
+			"versionExact": "v1.9.0"
+		},
+		{
 			"checksumSHA1": "6KV7DzMiMWnJbp5qhycmPIQ4t70=",
 			"path": "github.com/emirpasic/gods/utils",
 			"revision": "f6c17b524822278a87e3b3bd809fec33b51f5b46",
