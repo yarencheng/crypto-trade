@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"sync"
@@ -212,11 +213,19 @@ func (this *Analyzer) worker() {
 			case this.OrderBooks <- order:
 			}
 
-			var buy entity.BuyOrderEvent
-			select {
-			case <-this.stop:
-				return
-			case buy = <-this.BuyOrders:
+			buyOrders := list.New()
+			// var buy entity.BuyOrderEvent
+		L:
+			for {
+				select {
+				case <-this.stop:
+					return
+				case buy := <-this.BuyOrders:
+					if buy.Type == entity.None {
+						break L
+					}
+					buyOrders.PushBack(buy)
+				}
 			}
 
 			delay := time.Now().Sub(start)
@@ -229,14 +238,15 @@ func (this *Analyzer) worker() {
 				delay,
 			})
 
-			err = this.processBuy(&buy)
-			if err != nil {
-				logger.Warnf("Handle bue failed. err: [%v]", err)
-				return
+			for c := buyOrders.Front(); c != nil; c = c.Next() {
+				buy := c.Value.(entity.BuyOrderEvent)
+				err = this.processBuy(&buy)
+				if err != nil {
+					logger.Warnf("Handle bue failed. err: [%v]", err)
+					return
+				}
+				logger.Debugf("buy [%v]", buy)
 			}
-
-			logger.Debugf("buy [%v]", buy)
-
 		}
 
 		err = this.recordProcessTimes(processTime)
@@ -368,8 +378,6 @@ func (this *Analyzer) updateOrder(e *entity.OrderBookEvent) error {
 
 func (this *Analyzer) processBuy(e *entity.BuyOrderEvent) error {
 	switch e.Type {
-	case entity.None:
-		return nil
 	case entity.FillOrKill:
 
 	default:
