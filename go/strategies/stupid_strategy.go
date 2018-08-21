@@ -80,6 +80,68 @@ func (this *StupidStrategy) worker() {
 				return
 			}
 
+			// for each pair in a exchange
+			for ex1, _ := range this.priceBook {
+				for cur1, _ := range this.priceBook[ex1] {
+					for cur2, books1 := range this.priceBook[ex1][cur1] {
+
+						// find all reverse pair in other exchanges
+						for ex2, _ := range this.priceBook {
+							if ex1 == ex2 {
+								break
+							}
+							if _, exist := this.priceBook[ex2][cur2]; !exist {
+								break
+							}
+							if _, exist := this.priceBook[ex2][cur2][cur1]; !exist {
+								break
+							}
+							books2 := this.priceBook[ex2][cur2][cur1]
+
+							high1, ok1 := books1.Floor(float64(9999999))
+							high2, ok2 := books2.Floor(float64(9999999))
+
+							if !ok1 || !ok2 {
+								continue
+							}
+
+							v1 := high1.Key.(float64)
+							v2 := high2.Key.(float64)
+
+							// logger.Warnf("%v %v = %v", v1, v2, v1*v2)
+
+							fee := 0.001
+							if v1*v2*(1-fee)*(1-fee) <= 1 {
+								continue
+							}
+
+							logger.Infof("[%v-%v-%v]=[$%v,%v], [%v-%v-%v]=[$%v,%v] %v%%",
+								ex1, cur1, cur2, high1.Key, high1.Value.(float64),
+								ex2, cur2, cur1, high2.Key, high2.Value.(float64),
+								v1*v2*(1-fee)*(1-fee)-1,
+							)
+
+							// return
+
+							/*
+
+								1 * x = b
+								b * y > 1   x*y>1
+
+
+								1 * x * (1-z) = b
+								b * y * (1-z) > 1
+								(x - xz) * (y - yz) > 1
+								xy + xyz^2 - 2xyz > 1
+								xy (1 + z^2 - 2z) > 1
+								xy (1-z)^2 > 1
+
+							*/
+						}
+					}
+				}
+			}
+
 			this.OutOrders <- entity.BuyOrderEvent{
 				Type: entity.None,
 			}
@@ -128,7 +190,11 @@ func (this *StupidStrategy) updatePriceBook(order *entity.OrderBookEvent) error 
 		to[order.To] = price
 	}
 
-	price.Put(order.Price, order.Volume)
+	if order.Volume == 0 {
+		price.Remove(order.Price)
+	} else {
+		price.Put(order.Price, order.Volume)
+	}
 
 	return nil
 }
